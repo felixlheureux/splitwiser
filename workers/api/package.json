@@ -1,0 +1,28 @@
+{
+  "name": "api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler types && wrangler deploy --dry-run",
+    "types": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply splitwiser-d1-production --local --config wrangler.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply splitwiser-d1-production --remote --config wrangler.jsonc",
+    "lint": "oxlint src",
+    "typecheck": "wrangler types && tsc --noEmit"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.7.2",
+    "@splitwiser/shared": "workspace:*",
+    "better-auth": "^1.7.2",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.9.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "drizzle-kit": "^0.31.10",
+    "oxlint": "^1.81.0",
+    "typescript": "~6.0.3"
+  }
+}

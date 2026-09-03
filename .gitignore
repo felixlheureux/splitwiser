@@ -1,0 +1,45 @@
+# Dependencies and build output
+node_modules/
+dist/
+dist-ssr/
+.wrangler/
+*.local
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+*.dev.vars
+!.dev.vars.example
+
+# OpenTofu local state, plans, variables, and overrides
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+plan.cache
+plan.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Generated Cloudflare Worker bindings
+worker-configuration.d.ts
+
+# Logs and local tooling
+logs/
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Documents
+documents/**/*.pdf

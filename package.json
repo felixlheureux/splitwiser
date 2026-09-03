@@ -1,0 +1,27 @@
+{
+  "name": "splitwiser",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=24.19.0 <25",
+    "pnpm": ">=11 <12"
+  },
+  "scripts": {
+    "dev": "pnpm --filter dashboard dev",
+    "dev:api": "pnpm --filter api dev",
+    "build": "pnpm -r --if-present run build",
+    "lint": "pnpm -r --if-present run lint",
+    "preview": "pnpm --filter dashboard preview",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "db:migrate:local": "pnpm --filter api db:migrate:local",
+    "db:migrate:remote": "pnpm --filter api db:migrate:remote",
+    "check": "pnpm lint && pnpm typecheck && pnpm build",
+    "infra:fmt": "tofu -chdir=infra/cloudflare fmt",
+    "infra:validate": "tofu -chdir=infra/cloudflare validate",
+    "infra:plan": "tofu -chdir=infra/cloudflare plan"
+  },
+  "devDependencies": {
+    "wrangler": "^4.128.0"
+  }
+}

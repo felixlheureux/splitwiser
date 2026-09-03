@@ -1,0 +1,5 @@
+# Local Worker secrets. Copy to .dev.vars and replace every value.
+BETTER_AUTH_SECRET=replace-with-a-local-random-value
+INVITE_SIGNING_SECRET=replace-with-a-local-random-value
+RESEND_API_KEY=replace-with-a-local-value
+TURNSTILE_SECRET_KEY=replace-if-enabled

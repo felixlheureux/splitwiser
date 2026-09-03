@@ -1,0 +1,14 @@
+cloudflare_app_api_token = "replace-with-pages-and-d1-token"
+cloudflare_dns_api_token = "replace-with-dns-token"
+cloudflare_app_account_id = "replace-with-splitwiser-app-account-id"
+cloudflare_zone_id    = "replace-with-splitwiser-zone-id"
+
+dashboard_project_name = "splitwiser-dashboard-production"
+d1_database_name       = "splitwiser-d1-production"
+landing_project_name   = "splitwiser-landing-production"
+
+# Keep false until the landing app is built.
+create_landing_project = false
+
+# Add the exact Resend SPF, DKIM, and MX records supplied by Resend.
+email_provider_dns_records = []
