@@ -1,7 +1,13 @@
 # Splitwiser
 
-Splitwiser is a mobile-first shared expense ledger built as a downloadable,
-installable PWA. The product and technical contract live in [SPEC.md](SPEC.md).
+Splitwiser is an open-source alternative to Splitwise for people who want the
+basics to stay simple and accessible. It is a mobile-first shared expense ledger
+for groups, with clear balances, repayment suggestions, and an installable PWA.
+
+Built in response to essential expense-sharing features becoming increasingly
+paywalled, Splitwiser keeps the core workflow focused: record expenses, see who
+owes what, and settle up without a subscription for basic use. The product and
+technical contract live in [SPEC.md](SPEC.md).
 
 ## Prerequisites
 
