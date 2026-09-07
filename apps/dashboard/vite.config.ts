@@ -16,7 +16,7 @@ export default defineConfig({
     tailwindcss(),
     react(),
     VitePWA({
-      registerType: 'prompt',
+      injectRegister: null,
       workbox: {
         skipWaiting: true,
         clientsClaim: true,

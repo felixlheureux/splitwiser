@@ -1,6 +1,5 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { registerSW } from 'virtual:pwa-register';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import './index.css';
@@ -9,10 +8,8 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 });
 
-function renderApp() {
-  const rootElement = document.getElementById('root');
-  if (!rootElement) return;
-
+const rootElement = document.getElementById('root');
+if (rootElement) {
   createRoot(rootElement).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
@@ -22,36 +19,23 @@ function renderApp() {
   );
 }
 
-async function startApp() {
-  // If a new version was downloaded in the background, activate it before mounting
-  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    try {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg?.waiting) {
-        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  // Render the application immediately on launch
-  renderApp();
-
-  // Register service worker in the background without mid-session reloads
-  registerSW({
-    immediate: true,
-    onRegisteredSW(_swScriptUrl, registration) {
-      if (registration) {
+// Standard service worker registration: caches new versions in background with ZERO mid-session reloads
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((reg) => {
+        // Proactively check for updates when returning to the app
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') {
-            void registration.update();
+            void reg.update();
           }
         });
-      }
-    },
+      })
+      .catch(() => {
+        // Ignore registration failures in private/restricted environments
+      });
   });
 }
 
-void startApp();
 
