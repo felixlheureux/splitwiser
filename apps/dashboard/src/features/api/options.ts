@@ -127,10 +127,12 @@ export function createAPI(queryClient: QueryClient, appOrigin: string) {
         queryOptions({
           queryKey: apiKeys.groups.join(code),
           queryFn: ({ signal }) =>
-            request<{ group: Group; members: { id: string; name: string; isClaimed: boolean }[] }>(
-              `/api/groups/join/${code}`,
-              { signal },
-            ),
+            request<{
+              group: Group;
+              alreadyMember: boolean;
+              myMemberId: string | null;
+              members: { id: string; name: string; isClaimed: boolean }[];
+            }>(`/api/groups/join/${code}`, { signal }),
         }),
       join: (code: string) =>
         mutationOptions({

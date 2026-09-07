@@ -46,6 +46,7 @@ members.post('/api/groups/:id/members', async (c) => {
 // Resolve invite link (returns group & members for joining)
 members.get('/api/groups/join/:code', async (c) => {
   const code = c.req.param('code');
+  const identity = await getIdentity(c);
   const db = createDb(c.env.DB);
 
   const [group] = await db.select().from(groupsTable).where(eq(groupsTable.inviteCode, code));
@@ -56,8 +57,16 @@ members.get('/api/groups/join/:code', async (c) => {
     .from(groupMembersTable)
     .where(eq(groupMembersTable.groupId, group.id));
 
+  const existingMember = groupMembers.find(
+    (m) =>
+      (identity.type === 'user' && m.userId === identity.id) ||
+      (identity.type === 'guest' && m.guestId === identity.id),
+  );
+
   return c.json({
     group: groupSchema.parse(group),
+    alreadyMember: Boolean(existingMember),
+    myMemberId: existingMember?.id ?? null,
     members: groupMembers.map((m) => ({
       id: m.id,
       name: m.name,
@@ -75,6 +84,23 @@ members.post('/api/groups/join/:code', async (c) => {
 
   const [group] = await db.select().from(groupsTable).where(eq(groupsTable.inviteCode, code));
   if (!group) throw new ApiError('not_found', 'Invalid invite link.', 404);
+
+  // Reject if this identity is already a member of this group
+  const [alreadyMember] = await db
+    .select()
+    .from(groupMembersTable)
+    .where(
+      and(
+        eq(groupMembersTable.groupId, group.id),
+        identity.type === 'user'
+          ? eq(groupMembersTable.userId, identity.id)
+          : eq(groupMembersTable.guestId, identity.id),
+      ),
+    );
+
+  if (alreadyMember) {
+    throw new ApiError('already_member', 'You are already a member of this group.', 409);
+  }
 
   let memberId: string;
   const now = new Date().toISOString();

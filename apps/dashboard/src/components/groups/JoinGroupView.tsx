@@ -43,8 +43,43 @@ export function JoinGroupView({ code, onJoined }: JoinGroupViewProps) {
     );
   }
 
-  const { group, members } = infoQuery.data;
+  const { group, members, alreadyMember } = infoQuery.data;
   const unclaimedMembers = members.filter((m) => !m.isClaimed);
+
+  if (alreadyMember) {
+    return (
+      <div className="p-4 space-y-6 flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
+        <div className="text-center space-y-2">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-600 shadow-xs">
+            <Users className="h-7 w-7" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">Already in this group</h2>
+          <p className="text-xs text-slate-500">
+            You are already a member of <strong className="text-slate-800 font-semibold">{group.name}</strong>.
+          </p>
+        </div>
+
+        <Card className="border-slate-200/80 bg-white shadow-xs">
+          <CardContent className="p-4 space-y-2.5">
+            <Button
+              className="w-full font-semibold bg-teal-600 hover:bg-teal-700 h-11 rounded-xl"
+              onClick={() => onJoined(group.id)}
+            >
+              Open group
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full font-semibold text-xs h-10 rounded-xl"
+              onClick={() => (window.location.href = '/')}
+            >
+              Back to all groups
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   function handleClaim(memberId: string) {
     joinMutation.mutate(

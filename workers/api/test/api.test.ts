@@ -152,6 +152,26 @@ test('guest creates group, invites friend via link, splits bill, and settles up'
   });
   assert.equal(claimRes.status, 201);
 
+  // Bob tries to join again -> 409 already_member
+  const rejoinRes = await request(`/api/groups/join/${group.inviteCode}`, {
+    cookie: bobGuestCookie,
+    ip: '192.0.2.2',
+    body: { name: 'Bob Second Time' },
+  });
+  assert.equal(rejoinRes.status, 409);
+  const rejoinBody = await rejoinRes.json();
+  assert.equal(rejoinBody.error.code, 'already_member');
+
+  // Bob checks join info -> alreadyMember is true
+  const bobJoinInfoRes = await request(`/api/groups/join/${group.inviteCode}`, {
+    cookie: bobGuestCookie,
+    ip: '192.0.2.2',
+  });
+  assert.equal(bobJoinInfoRes.status, 200);
+  const bobJoinInfo = await bobJoinInfoRes.json();
+  assert.equal(bobJoinInfo.alreadyMember, true);
+  assert.equal(bobJoinInfo.myMemberId, charlie.id);
+
   // 4. Alice adds an expense ($60 dinner split equally between Alice and Charlie/Bob)
   const detailRes = await request(`/api/groups/${group.id}`, { cookie: guestCookie });
   const detail = await detailRes.json();

@@ -26,6 +26,15 @@ export function GroupList({ user, onSelectGroup, onNewGroup, onJoinCode }: Group
     e.preventDefault();
     const cleanCode = joinCodeInput.trim().replace(/^.*\/join\//, '');
     if (!cleanCode) return;
+
+    // If user already belongs to this group, select it directly
+    const existing = groups.find((g) => g.inviteCode.toLowerCase() === cleanCode.toLowerCase());
+    if (existing) {
+      onSelectGroup(existing.id);
+      setJoinCodeInput('');
+      return;
+    }
+
     onJoinCode(cleanCode);
   }
 
