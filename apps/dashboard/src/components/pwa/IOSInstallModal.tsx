@@ -190,7 +190,7 @@ export function IOSInstallModal({
                       1
                     </span>
                     <span className="leading-snug">
-                      Tap your browser's menu <strong className="text-slate-900 font-semibold">(⋮ three dots)</strong> in the top-right corner
+                      Tap your browser's menu <strong className="text-slate-900 font-semibold">(⋮ three dots)</strong> in the top or bottom corner
                     </span>
                   </div>
                   <div className="flex items-start gap-2.5 text-xs text-slate-700">

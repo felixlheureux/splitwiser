@@ -36,8 +36,9 @@ Splitwiser is designed around a simple philosophy: **splitting a dinner bill or 
 ## Features
 
 - **Equal & Custom Splits**: Split bills equally among all or select participants with 1 tap.
-- **Offline Member Support**: Add friends who don't have the app yet. When they click the invite link, they can claim their existing balance in 1 click.
-- **Rejoin Protection**: Prevents duplicate members or accidental multiple claims in the same group.
+- **Formatted Currency with Thousands Separators**: Crisp, readable number formatting (e.g. `$1,250.00`).
+- **Offline Member Support & Seamless Reclaiming**: Add friends who don't have the app yet. Friends can claim their name when joining—and if they clear browser cookies or switch devices, they can reclaim their member slot without lockouts.
+- **Platform-Adaptive PWA Install**: 1-tap install on Android & Desktop, simple 2-step browser menu fallback (`⋮` menu on mobile, Share sheet on iOS, Omnibox icon on Desktop) — with zero confusing desktop-only instructions on phones.
 - **1-Tap Settle Up**: Clear record of repayments that update balances in real time.
 - **Passwordless Account Linking**: Link your email anytime via a password-free magic link delivered via Resend. Seamlessly merges guest groups into your profile.
 - **Multi-Layered Edge Security**: Cloudflare WAF rate limiting, Bot Fight Mode, payload size limits, and Cloudflare Turnstile challenge verification.
@@ -106,13 +107,18 @@ Splitwiser is designed around a simple philosophy: **splitting a dinner bill or 
 
 | Command | Action |
 | :--- | :--- |
-| `pnpm dev` | Start dashboard Vite dev server |
-| `pnpm dev:api` | Start backend Hono API with Wrangler local D1 emulator |
+| `pnpm dev` | Start dashboard Vite dev server (http://localhost:5173) |
+| `pnpm dev:landing` | Start landing page Vite dev server (http://localhost:5174) |
+| `pnpm dev:api` | Start backend Hono API with Wrangler local D1 emulator (http://localhost:8787) |
 | `pnpm check` | Run linter, typecheck, test suites, and production builds |
 | `pnpm test` | Run API integration tests and dashboard unit tests |
-| `pnpm build` | Build production bundles for PWA and Worker |
+| `pnpm build` | Build production bundles for PWA, landing site, and Worker |
 | `pnpm db:migrate:local` | Apply D1 schema migrations to local emulator |
 | `pnpm db:migrate:remote` | Apply D1 schema migrations to production Cloudflare D1 |
+| `pnpm deploy:landing` | Build and deploy landing page to Cloudflare Pages (`splitwiser.app`) |
+| `pnpm deploy:dashboard` | Build and deploy PWA dashboard to Cloudflare Pages (`dash.splitwiser.app`) |
+| `pnpm deploy:api` | Run remote migrations and deploy API Worker to Cloudflare |
+| `pnpm deploy:all` | Build and deploy full stack (API + both Pages apps) |
 | `pnpm infra:fmt` | Format OpenTofu infrastructure code |
 | `pnpm infra:validate` | Validate OpenTofu infrastructure configuration |
 
@@ -123,7 +129,8 @@ Splitwiser is designed around a simple philosophy: **splitting a dinner bill or 
 ```text
 splitwiser/
 ├── apps/
-│   └── dashboard/        # React 19 + Vite PWA frontend (Tailwind v4, shadcn/ui)
+│   ├── dashboard/        # React 19 + Vite PWA frontend (dash.splitwiser.app)
+│   └── landing/          # SEO landing page with debt visualizer & FAQ (splitwiser.app)
 ├── packages/
 │   └── shared/           # Shared TypeScript schemas, types, routes, and math
 ├── workers/

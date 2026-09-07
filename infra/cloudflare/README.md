@@ -63,5 +63,6 @@ needs DNS Edit and Zone Read for the separate account that owns
 All deployments are manual. Review the plan before running `tofu apply`; the
 GitLab HTTP lock serializes concurrent OpenTofu operations.
 
-The future landing Pages project is disabled by default with
-`create_landing_project = false` until `apps/landing` is implemented.
+The landing Pages project (`splitwiser-landing-production`) hosts `apps/landing`
+on the apex domain `splitwiser.app`, while `splitwiser-dashboard-production` hosts
+the PWA dashboard on `dash.splitwiser.app`.

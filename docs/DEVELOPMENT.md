@@ -29,13 +29,16 @@ pnpm db:migrate:local
 
 ### Starting the Local Environment
 
-Run the two services in separate terminals:
+Run the services in separate terminals:
 
 ```bash
-# Terminal 1: Vite React Dashboard (Runs at http://localhost:5173)
+# Terminal 1: Vite React Dashboard PWA (Runs at http://localhost:5173)
 pnpm dev
 
-# Terminal 2: Cloudflare Worker API with local D1 emulator (Runs at http://localhost:8787)
+# Terminal 2: Vite React SEO Landing Page (Runs at http://localhost:5174)
+pnpm dev:landing
+
+# Terminal 3: Cloudflare Worker API with local D1 emulator (Runs at http://localhost:8787)
 pnpm dev:api
 ```
 
@@ -130,19 +133,26 @@ tofu -chdir=infra/cloudflare validate
 
 ```text
 splitwiser/
-├── apps/dashboard/
-│   ├── src/
-│   │   ├── components/       # shadcn/ui and feature components
-│   │   │   ├── auth/         # SaveAccountModal (with Turnstile integration)
-│   │   │   ├── expenses/     # AddExpenseSheet, ExpenseList
-│   │   │   ├── groups/       # GroupList, GroupDetail, JoinGroupView, BalanceSummaryCard
-│   │   │   ├── layout/       # AppHeader, AppMenuSheet, MobileShell
-│   │   │   ├── pwa/          # InstallBanner, IOSInstallModal
-│   │   │   └── ui/           # Radix / shadcn reusable primitives
-│   │   ├── features/api/     # Query options, mutations, and API request fetchers
-│   │   ├── hooks/            # useAPI, usePWAInstall
-│   │   └── lib/              # Formatting utilities, currency helpers
-│   └── vite.config.ts        # Vite + Tailwind v4 + VitePWA config
+├── apps/
+│   ├── dashboard/            # React 19 + Vite PWA frontend (dash.splitwiser.app)
+│   │   ├── src/
+│   │   │   ├── components/   # shadcn/ui and feature components
+│   │   │   │   ├── auth/     # SaveAccountModal (with Turnstile integration)
+│   │   │   │   ├── expenses/ # AddExpenseSheet, ExpenseList
+│   │   │   │   ├── groups/   # GroupList, GroupDetail, JoinGroupView, BalanceSummaryCard
+│   │   │   │   ├── layout/   # AppHeader, AppMenuSheet, MobileShell
+│   │   │   │   ├── pwa/      # InstallBanner, IOSInstallModal (platform-adaptive install UX)
+│   │   │   │   └── ui/       # Radix / shadcn reusable primitives
+│   │   │   ├── features/api/ # Query options, mutations, and API request fetchers
+│   │   │   ├── hooks/        # useAPI, usePWAInstall
+│   │   │   └── lib/          # Formatting utilities, currency helpers (formatCents)
+│   │   └── vite.config.ts    # Vite + Tailwind v4 + VitePWA config
+│   └── landing/              # React 19 + Vite SEO Landing Page (splitwiser.app)
+│       ├── public/           # Favicons, 1200x630 og-image.png, robots.txt, sitemap.xml
+│       ├── src/
+│       │   ├── components/   # Hero, DebtDemo, Comparison, Features, FAQ, Header, Footer
+│       │   └── index.css     # Design tokens & styles
+│       └── index.html        # Comprehensive metadata, OpenGraph, and JSON-LD schemas
 ├── packages/shared/
 │   ├── src/
 │   │   ├── balance.ts        # Graph debt simplification algorithm
@@ -162,11 +172,13 @@ splitwiser/
 
 ## 6. Progressive Web App (PWA) Notes
 
-- Built with `vite-plugin-pwa` with `generateSW` strategy.
-- Service worker precaches critical HTML, CSS, and JS bundles for instant loading.
-- Native installation prompt is captured via `beforeinstallprompt` on Android, Chrome, and Desktop browsers.
-- iOS Safari installation is guided through a custom modal (`IOSInstallModal`) demonstrating the native share sheet action.
-- Banner dismissal is persisted in `localStorage` (`splitwiser_pwa_banner_dismissed`).
+- **Service Worker**: Configured via `vite-plugin-pwa` with `generateSW` strategy for precaching HTML, JS, CSS, and web manifests.
+- **Platform-Adaptive Installation UX**:
+  - **Android & Mobile Chrome**: Captures `beforeinstallprompt`. Offers a prominent **1-tap direct install** button. If the native trigger is unavailable or was previously dismissed, provides a 2-step guide via the browser's menu (**`⋮`** in the top or bottom corner $\rightarrow$ **"Install app"** / **"Add to Home screen"**). Never shows desktop-specific address-bar instructions on mobile devices.
+  - **iOS Safari**: Provides clear visual 2-step instructions: tap the **Share icon (`⎋`)** in Safari's bottom toolbar, then tap **"Add to Home Screen" (`➕`)**.
+  - **Desktop Chromium (Chrome/Edge/Brave)**: Provides 1-tap install and guides users to the Omnibox install button (**`⊕`** or **"Installer"**) in the URL address bar.
+  - **Desktop Firefox/Zen**: Guides users to bookmarking shortcuts (`⌘ + D` / `Ctrl + D`) and suggests Chrome or mobile for standalone window mode.
+- **Banner Dismissal**: Banner dismiss state is persisted in `localStorage` under `splitwiser_pwa_banner_dismissed`. Users can re-trigger installation anytime from the slide-out user menu.
 
 ---
 
