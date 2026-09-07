@@ -198,7 +198,6 @@ export function AddExpenseSheet({
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     disabled={createExpense.isPending}
-                    autoFocus
                   />
                 </div>
                 {field.state.meta.errors?.[0] && (

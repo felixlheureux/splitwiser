@@ -124,9 +124,11 @@ export function AppMenuSheet({
               <Button
                 variant="outline"
                 className="w-full justify-start text-slate-800"
-                onClick={() => {
-                  onOpenChange(false);
-                  void promptInstall();
+                onClick={async () => {
+                  const installed = await promptInstall();
+                  if (installed) {
+                    onOpenChange(false);
+                  }
                 }}
               >
                 <Download className="h-4 w-4 mr-2 text-teal-600" />

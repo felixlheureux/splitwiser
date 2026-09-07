@@ -26,7 +26,7 @@ export const apiKeys = {
   },
 };
 
-export function createAPI(queryClient: QueryClient, appOrigin: string) {
+export function createAPI(queryClient: QueryClient, _appOrigin: string) {
   function expireSession() {
     queryClient.removeQueries({ queryKey: apiKeys.groups.all });
     queryClient.setQueryData(apiKeys.profile, null);
@@ -146,6 +146,41 @@ export function createAPI(queryClient: QueryClient, appOrigin: string) {
             await queryClient.invalidateQueries({ queryKey: apiKeys.groups.all });
           },
         }),
+      archive: (groupId: string) =>
+        mutationOptions({
+          mutationKey: ['groups', 'archive', groupId],
+          mutationFn: () =>
+            authenticatedRequest<{ success: true; archivedAt: string }>(`/api/groups/${groupId}/archive`, {
+              method: 'POST',
+            }),
+          onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: apiKeys.groups.all });
+            await queryClient.invalidateQueries({ queryKey: apiKeys.groups.detail(groupId) });
+          },
+        }),
+      unarchive: (groupId: string) =>
+        mutationOptions({
+          mutationKey: ['groups', 'unarchive', groupId],
+          mutationFn: () =>
+            authenticatedRequest<{ success: true; archivedAt: null }>(`/api/groups/${groupId}/unarchive`, {
+              method: 'POST',
+            }),
+          onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: apiKeys.groups.all });
+            await queryClient.invalidateQueries({ queryKey: apiKeys.groups.detail(groupId) });
+          },
+        }),
+      removeMember: (groupId: string) =>
+        mutationOptions({
+          mutationKey: ['groups', 'members', 'remove', groupId],
+          mutationFn: (memberId: string) =>
+            authenticatedRequest<{ success: true }>(`/api/groups/${groupId}/members/${memberId}`, {
+              method: 'DELETE',
+            }),
+          onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: apiKeys.groups.detail(groupId) });
+          },
+        }),
     },
     expenses: {
       create: (groupId: string) =>
@@ -173,21 +208,35 @@ export function createAPI(queryClient: QueryClient, appOrigin: string) {
         }),
     },
     auth: {
-      signIn: () =>
+      sendOtp: () =>
         mutationOptions({
-          mutationKey: ['auth', 'sign-in'],
-          mutationFn: (input: string | { email: string; turnstileToken?: string }) => {
-            const email = typeof input === 'string' ? input : input.email;
-            const turnstileToken = typeof input === 'string' ? undefined : input.turnstileToken;
-            return request<{ status: boolean }>(apiRoutes.auth.signIn, {
+          mutationKey: ['auth', 'send-otp'],
+          mutationFn: (input: { email: string; turnstileToken?: string }) =>
+            request<{ success: boolean }>(apiRoutes.auth.sendOtp, {
               method: 'POST',
               body: JSON.stringify({
-                email,
-                callbackURL: `${appOrigin}/`,
-                errorCallbackURL: `${appOrigin}/?authError=1`,
-                ...(turnstileToken ? { turnstileToken } : {}),
+                email: input.email,
+                type: 'sign-in',
+                ...(input.turnstileToken ? { turnstileToken: input.turnstileToken } : {}),
               }),
-            });
+            }),
+        }),
+      verifyOtp: () =>
+        mutationOptions({
+          mutationKey: ['auth', 'verify-otp'],
+          mutationFn: (input: { email: string; otp: string }) =>
+            request<{ user: unknown }>(apiRoutes.auth.verifyOtp, {
+              method: 'POST',
+              body: JSON.stringify({
+                email: input.email,
+                otp: input.otp,
+              }),
+            }),
+          onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: apiKeys.profile });
+            await queryClient.invalidateQueries({ queryKey: apiKeys.groups.all });
+            await queryClient.refetchQueries({ queryKey: apiKeys.profile });
+            await queryClient.refetchQueries({ queryKey: apiKeys.groups.all });
           },
         }),
       signOut: () =>

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ArrowRight, Check, UserCheck, UserPlus, Users } from 'lucide-react';
 import { useAPI } from '../../hooks/useAPI';
@@ -59,22 +59,22 @@ export function JoinGroupView({ code, onJoined }: JoinGroupViewProps) {
           </div>
           <h2 className="text-xl font-bold text-slate-900">Already in this group</h2>
           <p className="text-xs text-slate-500">
-            You are already a member of <strong className="text-slate-800 font-semibold">{group.name}</strong>.
+            You are already a member of <span className="font-semibold text-slate-700">{group.name}</span>.
           </p>
         </div>
 
-        <Card className="border-slate-200/80 bg-white shadow-xs">
+        <Card className="border-slate-200/80 shadow-xs">
           <CardContent className="p-4 space-y-2.5">
             <Button
-              className="w-full font-semibold bg-teal-600 hover:bg-teal-700 h-11 rounded-xl"
+              className="w-full text-xs font-semibold h-10 bg-teal-600 hover:bg-teal-700"
               onClick={() => onJoined(group.id)}
             >
-              Open group
-              <ArrowRight className="h-4 w-4 ml-1" />
+              Go to group
+              <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
             <Button
               variant="outline"
-              className="w-full font-semibold text-xs h-10 rounded-xl"
+              className="w-full text-xs font-semibold h-10 border-slate-200"
               onClick={() => setForceReclaim(true)}
             >
               Switch or reclaim a different member
@@ -102,7 +102,7 @@ export function JoinGroupView({ code, onJoined }: JoinGroupViewProps) {
     setNameInput('');
   }
 
-  function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: SyntheticEvent) {
     e.preventDefault();
 
     if (selectedMember) {
@@ -227,7 +227,6 @@ export function JoinGroupView({ code, onJoined }: JoinGroupViewProps) {
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   disabled={joinMutation.isPending}
-                  autoFocus={isSomeoneElse}
                 />
                 {selectedMember && (
                   <p className="text-[11px] text-slate-400 px-0.5">

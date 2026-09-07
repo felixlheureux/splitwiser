@@ -1,22 +1,34 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
+  AlertTriangle,
+  Archive,
+  ArchiveRestore,
   Check,
   DollarSign,
   Plus,
   Share2,
+  Trash2,
   UserCheck,
   UserPlus,
   Users,
 } from 'lucide-react';
-import type { SuggestedRepayment } from '@splitwiser/shared';
+import type { Member, SuggestedRepayment } from '@splitwiser/shared';
 import { useAPI } from '../../hooks/useAPI';
+import { useHistoryOverlay } from '../../hooks/useHistoryOverlay';
 import { formatCents } from '../../lib/utils';
 import { AddExpenseSheet } from '../expenses/AddExpenseSheet';
 import { ExpenseList } from '../expenses/ExpenseList';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { AddMemberModal } from './AddMemberModal';
 import { BalanceSummaryCard } from './BalanceSummaryCard';
@@ -28,14 +40,32 @@ interface GroupDetailProps {
 export function GroupDetail({ groupId }: GroupDetailProps) {
   const api = useAPI();
   const detailQuery = useQuery(api.groups.detail(groupId));
+  const archiveMutation = useMutation(api.groups.archive(groupId));
+  const unarchiveMutation = useMutation(api.groups.unarchive(groupId));
+  const removeMemberMutation = useMutation(api.groups.removeMember(groupId));
+
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<Member | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [activeSettlement, setActiveSettlement] = useState<{
     fromMemberId?: string;
     toMemberId: string;
     amountCents: number;
   } | null>(null);
+
+  // Hook up history interception to dismiss sheets & dialogs on back gesture
+  useHistoryOverlay(expenseSheetOpen, () => setExpenseSheetOpen(false), 'expense-sheet');
+  useHistoryOverlay(addMemberOpen, () => setAddMemberOpen(false), 'add-member');
+  useHistoryOverlay(
+    Boolean(memberToRemove),
+    () => {
+      setMemberToRemove(null);
+      setRemoveError(null);
+    },
+    'remove-member',
+  );
 
   if (detailQuery.isPending) {
     return (
@@ -104,26 +134,72 @@ export function GroupDetail({ groupId }: GroupDetailProps) {
             </div>
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 px-3 gap-1.5 text-xs font-semibold shrink-0"
-            onClick={copyInviteLink}
-          >
-            {copied ? (
-              <>
-                <Check className="h-3.5 w-3.5 text-teal-600" />
-                <span>Copied!</span>
-              </>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {group.archivedAt ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 px-2.5 gap-1.5 text-xs font-semibold shrink-0 text-amber-800 bg-amber-50/70 border-amber-200 hover:bg-amber-100"
+                onClick={() => unarchiveMutation.mutate()}
+                disabled={unarchiveMutation.isPending}
+                title="Restore this group to active list"
+              >
+                <ArchiveRestore className="h-3.5 w-3.5 text-amber-700" />
+                <span className="hidden sm:inline">Unarchive</span>
+              </Button>
             ) : (
-              <>
-                <Share2 className="h-3.5 w-3.5 text-slate-500" />
-                <span>Invite</span>
-              </>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 px-2.5 gap-1.5 text-xs font-semibold shrink-0 text-slate-600 hover:text-slate-900 border-slate-200"
+                onClick={() => archiveMutation.mutate()}
+                disabled={archiveMutation.isPending}
+                title="Archive this group"
+              >
+                <Archive className="h-3.5 w-3.5 text-slate-500" />
+                <span className="hidden sm:inline">Archive</span>
+              </Button>
             )}
-          </Button>
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 px-3 gap-1.5 text-xs font-semibold shrink-0"
+              onClick={copyInviteLink}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-teal-600" />
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Invite</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Archived Banner */}
+      {group.archivedAt && (
+        <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-2.5 flex items-center justify-between text-xs text-amber-800">
+          <div className="flex items-center gap-1.5 font-medium">
+            <Archive className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>This group is archived and hidden from the active list.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => unarchiveMutation.mutate()}
+            disabled={unarchiveMutation.isPending}
+            className="text-xs font-bold text-amber-900 underline hover:no-underline ml-2 shrink-0"
+          >
+            Restore
+          </button>
+        </div>
+      )}
 
       <div className="p-4 space-y-5">
         {/* Balance Card */}
@@ -213,18 +289,35 @@ export function GroupDetail({ groupId }: GroupDetailProps) {
                         </div>
                       </div>
 
-                      <span
-                        className={`text-xs font-bold shrink-0 ${
-                          memberBalance > 0
-                            ? 'text-emerald-600'
-                            : memberBalance < 0
-                            ? 'text-amber-600'
-                            : 'text-slate-400'
-                        }`}
-                      >
-                        {memberBalance > 0 ? '+' : ''}
-                        {formatCents(memberBalance)}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`text-xs font-bold ${
+                            memberBalance > 0
+                              ? 'text-emerald-600'
+                              : memberBalance < 0
+                              ? 'text-amber-600'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          {memberBalance > 0 ? '+' : ''}
+                          {formatCents(memberBalance)}
+                        </span>
+
+                        {!isMe && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                            onClick={() => {
+                              setRemoveError(null);
+                              setMemberToRemove(member);
+                            }}
+                            title={`Remove ${member.name}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -257,6 +350,71 @@ export function GroupDetail({ groupId }: GroupDetailProps) {
           </Button>
         )}
       </div>
+
+      {/* Member Removal Confirmation Dialog */}
+      <Dialog
+        open={Boolean(memberToRemove)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMemberToRemove(null);
+            setRemoveError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-rose-600 mb-1">
+              <AlertTriangle className="h-5 w-5" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Remove Person</span>
+            </div>
+            <DialogTitle>Remove {memberToRemove?.name}?</DialogTitle>
+            <DialogDescription className="text-xs">
+              Are you sure you want to remove {memberToRemove?.name} from this group? Members can only be removed if they have no paid expenses and an unsettled balance of $0.00.
+            </DialogDescription>
+          </DialogHeader>
+
+          {removeError && (
+            <p className="text-xs text-rose-600 font-medium bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+              {removeError}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={removeMemberMutation.isPending}
+              onClick={() => {
+                setMemberToRemove(null);
+                setRemoveError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={removeMemberMutation.isPending}
+              onClick={() => {
+                if (!memberToRemove) return;
+                setRemoveError(null);
+                removeMemberMutation.mutate(memberToRemove.id, {
+                  onSuccess: () => {
+                    setMemberToRemove(null);
+                  },
+                  onError: (err) => {
+                    setRemoveError(err.message || 'Failed to remove member.');
+                  },
+                });
+              }}
+            >
+              {removeMemberMutation.isPending ? 'Removing…' : 'Remove member'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Expense Sheet */}
       <AddExpenseSheet

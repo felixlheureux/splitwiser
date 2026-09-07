@@ -1,5 +1,6 @@
 import {
   addMemberSchema,
+  calculateBalances,
   groupSchema,
   joinGroupSchema,
   memberSchema,
@@ -7,7 +8,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { getIdentity } from '../auth/session';
-import { createDb, groupMembersTable, groupsTable } from '../db';
+import { createDb, expensesTable, groupMembersTable, groupsTable } from '../db';
 import { ApiError, type ApiEnv } from '../errors';
 import { parseBody } from '../validation';
 
@@ -167,6 +168,85 @@ members.post('/api/groups/join/:code', async (c) => {
     },
     201,
   );
+});
+
+// Remove a member from the group
+members.delete('/api/groups/:id/members/:memberId', async (c) => {
+  const identity = await getIdentity(c);
+  const db = createDb(c.env.DB);
+  const groupId = c.req.param('id');
+  const memberId = c.req.param('memberId');
+
+  const [group] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId));
+  if (!group) throw new ApiError('not_found', 'Group not found.', 404);
+
+  const allMembers = await db
+    .select()
+    .from(groupMembersTable)
+    .where(eq(groupMembersTable.groupId, groupId));
+
+  const callerMember = allMembers.find((m) =>
+    identity.type === 'user' ? m.userId === identity.id : m.guestId === identity.id,
+  );
+
+  if (!callerMember && group.createdBy !== identity.id) {
+    throw new ApiError('forbidden', 'You must be a member of this group to remove someone.', 403);
+  }
+
+  const targetMember = allMembers.find((m) => m.id === memberId);
+  if (!targetMember) throw new ApiError('not_found', 'Member not found in this group.', 404);
+
+  if (callerMember && callerMember.id === memberId) {
+    throw new ApiError('bad_request', 'You cannot remove yourself from the group.', 400);
+  }
+
+  // Check if member paid for any expenses
+  const [paidExpense] = await db
+    .select({ id: expensesTable.id })
+    .from(expensesTable)
+    .where(and(eq(expensesTable.groupId, groupId), eq(expensesTable.paidByMemberId, memberId)))
+    .limit(1);
+
+  if (paidExpense) {
+    throw new ApiError(
+      'member_has_expenses',
+      `Cannot remove ${targetMember.name} because they have paid expenses in this group.`,
+      400,
+    );
+  }
+
+  // Check if member has an unsettled balance
+  const expensesRows = await db
+    .select()
+    .from(expensesTable)
+    .where(eq(expensesTable.groupId, groupId));
+
+  const parsedExpenses = expensesRows.map((e) => ({
+    id: e.id,
+    groupId: e.groupId,
+    description: e.description,
+    amountCents: e.amountCents,
+    paidByMemberId: e.paidByMemberId,
+    splitType: e.splitType as 'equal' | 'settlement',
+    splitWithMemberIds: JSON.parse(e.splitWithMemberIds || '[]') as string[],
+    createdAt: e.createdAt,
+  }));
+
+  const { balances } = calculateBalances(allMembers, parsedExpenses);
+  const targetBalance = balances.find((b) => b.memberId === memberId)?.balanceCents ?? 0;
+
+  if (targetBalance !== 0) {
+    throw new ApiError(
+      'member_has_balance',
+      `Cannot remove ${targetMember.name} because they have an unsettled balance. Settle up first.`,
+      400,
+    );
+  }
+
+  // Member has no paid expenses and zero balance: safe to delete
+  await db.delete(groupMembersTable).where(eq(groupMembersTable.id, memberId));
+
+  return c.json({ success: true });
 });
 
 export default members;

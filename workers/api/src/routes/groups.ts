@@ -48,6 +48,7 @@ groups.get('/api/groups', async (c) => {
         name: g.name,
         inviteCode: g.inviteCode,
         createdAt: g.createdAt,
+        archivedAt: g.archivedAt ?? null,
       })),
     }),
   );
@@ -70,6 +71,7 @@ groups.post('/api/groups', async (c) => {
     inviteCode,
     createdBy: identity.id,
     createdAt: now,
+    archivedAt: null,
   };
 
   const firstMember = {
@@ -128,7 +130,10 @@ groups.get('/api/groups/:id', async (c) => {
 
   return c.json(
     groupDetailSchema.parse({
-      group,
+      group: {
+        ...group,
+        archivedAt: group.archivedAt ?? null,
+      },
       members: members.map((m) => ({
         id: m.id,
         groupId: m.groupId,
@@ -143,6 +148,35 @@ groups.get('/api/groups/:id', async (c) => {
       myMemberId: myMember?.id ?? null,
     }),
   );
+});
+
+// Archive a group
+groups.post('/api/groups/:id/archive', async (c) => {
+  const identity = await getIdentity(c);
+  const db = createDb(c.env.DB);
+  const groupId = c.req.param('id');
+
+  const [group] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId));
+  if (!group) throw new ApiError('not_found', 'Group not found.', 404);
+
+  const now = new Date().toISOString();
+  await db.update(groupsTable).set({ archivedAt: now }).where(eq(groupsTable.id, groupId));
+
+  return c.json({ success: true, archivedAt: now });
+});
+
+// Unarchive a group
+groups.post('/api/groups/:id/unarchive', async (c) => {
+  const identity = await getIdentity(c);
+  const db = createDb(c.env.DB);
+  const groupId = c.req.param('id');
+
+  const [group] = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId));
+  if (!group) throw new ApiError('not_found', 'Group not found.', 404);
+
+  await db.update(groupsTable).set({ archivedAt: null }).where(eq(groupsTable.id, groupId));
+
+  return c.json({ success: true, archivedAt: null });
 });
 
 export default groups;

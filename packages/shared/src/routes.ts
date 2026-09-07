@@ -1,6 +1,7 @@
 export const apiRoutes = {
   auth: {
-    signIn: '/api/auth/sign-in/magic-link',
+    sendOtp: '/api/auth/email-otp/send-verification-otp',
+    verifyOtp: '/api/auth/sign-in/email-otp',
     signOut: '/api/auth/sign-out',
   },
   me: '/api/me',

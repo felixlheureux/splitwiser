@@ -48,7 +48,6 @@ export function CreateGroupModal({
         {
           onSuccess: (newGroup) => {
             form.reset();
-            onOpenChange(false);
             onSuccess(newGroup.id);
           },
         },
@@ -102,7 +101,6 @@ export function CreateGroupModal({
                   onChange={(e) => field.handleChange(e.target.value)}
                   disabled={create.isPending}
                   maxLength={80}
-                  autoFocus
                 />
                 {field.state.meta.errors?.[0] && (
                   <p className="text-xs text-rose-600">

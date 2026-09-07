@@ -8,10 +8,11 @@ Run `pnpm dev` from the repository root, alongside `pnpm dev:api`. Copy the root
 `http://localhost:8787` during development. Requests include the API’s session
 cookie. No authentication tokens are stored in browser storage.
 
-Enter your email to receive a sign-in link. Opening the email link verifies it
-at the API and redirects straight back to the dashboard. Expired or used links
-show a message with a form to request another. When returning to the original
-email-entry tab, it checks whether you have signed in in another tab.
+Enter your email to receive a 6-digit sign-in code. Entering the code
+in the dashboard or installed home-screen app verifies it at the API and
+signs you in immediately. Expired codes show a message with an option to request
+another. Because authentication uses 6-digit codes instead of links, installed
+PWAs sign in seamlessly without redirecting to external browser tabs.
 
 For a production build, set `VITE_API_BASE_URL` to the deployed API origin before
 running `pnpm --filter dashboard build`. The API must trust the dashboard’s

@@ -19,7 +19,11 @@ export default {
       return fetch(proxyReq);
     }
 
-    // Serve static frontend PWA assets from Pages
-    return env.ASSETS.fetch(request);
+    // Serve static frontend PWA assets from Pages (with SPA fallback for client routes)
+    const assetRes = await env.ASSETS.fetch(request);
+    if (assetRes.status === 404 && !url.pathname.includes('.')) {
+      return env.ASSETS.fetch(new URL('/', request.url));
+    }
+    return assetRes;
   },
 };

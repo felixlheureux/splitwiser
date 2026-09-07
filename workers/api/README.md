@@ -23,18 +23,13 @@ or Worker is deployed by the check commands below.
 
 ## Sign-in
 
-The dashboard POSTs an email and its callback URL to
-`/api/auth/sign-in/magic-link`. Resend delivers a single-use link. Clicking it
-verifies the email, sets a host-only session cookie, and redirects to the app
-automatically. Links last ten minutes and are stored hashed. Sessions last
-90 days and can renew every 30 days. Better Auth rate limits live in D1.
-
-New users save a display name through `PATCH /api/v1/me` before creating a
-group. `POST /api/v1/groups` accepts `{ name, currencyCode }`; the server
-derives the currency's decimal places. Requests use `credentials: include`.
-
-On iOS, an email link may open Safari instead of the installed app. It signs
-into that browser; there is no code fallback or automatic session transfer.
+The dashboard POSTs an email to `/api/auth/email-otp/send-verification-otp`
+protected by Cloudflare Turnstile bot verification. Resend delivers a 6-digit code.
+Submitting the code to `/api/auth/sign-in/email-otp` verifies the email, sets a
+host-only session cookie, and signs the user in directly inside the browser or
+installed PWA with zero browser redirect loops. Codes last ten minutes and are
+stored in D1. Sessions last 90 days and can renew every 30 days. Better Auth rate
+limits live in D1.
 
 ## Checks
 

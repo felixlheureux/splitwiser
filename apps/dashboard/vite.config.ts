@@ -16,7 +16,7 @@ export default defineConfig({
     tailwindcss(),
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
@@ -43,6 +43,9 @@ export default defineConfig({
         display: 'standalone',
         theme_color: '#0d9488',
         background_color: '#ffffff',
+        launch_handler: {
+          client_mode: 'navigate-existing',
+        },
         icons: [
           {
             src: '/pwa-192x192.png',

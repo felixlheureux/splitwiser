@@ -85,3 +85,25 @@ test('formatCents formats numbers with commas and currency symbols properly', as
   assert.equal(formatCents(123456789), '$1,234,567.89');
 });
 
+test('sendOtp and verifyOtp mutations call correct endpoints and update auth state', async (t) => {
+  const { client, api } = setup(t, (path, options) => {
+    if (path === apiRoutes.auth.sendOtp) {
+      assert.deepEqual(JSON.parse(String(options?.body)), { email: 'alice@example.com', type: 'sign-in' });
+      return Response.json({ success: true });
+    }
+    if (path === apiRoutes.auth.verifyOtp) {
+      assert.deepEqual(JSON.parse(String(options?.body)), { email: 'alice@example.com', otp: '123456' });
+      return Response.json({ user: alice });
+    }
+    return Response.json({});
+  });
+
+  const sendOtpMutation = new MutationObserver(client, api.auth.sendOtp());
+  const sendRes = await sendOtpMutation.mutate({ email: 'alice@example.com' });
+  assert.equal(sendRes.success, true);
+
+  const verifyOtpMutation = new MutationObserver(client, api.auth.verifyOtp());
+  const verifyRes = await verifyOtpMutation.mutate({ email: 'alice@example.com', otp: '123456' });
+  assert.deepEqual(verifyRes.user, alice);
+});
+

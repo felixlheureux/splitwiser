@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Mail, Sparkles } from 'lucide-react';
 import { useAPI } from '../../hooks/useAPI';
 import { Button } from '../ui/button';
@@ -39,14 +39,33 @@ interface SaveAccountModalProps {
 
 export function SaveAccountModal({ open, onOpenChange }: SaveAccountModalProps) {
   const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
 
+  const queryClient = useQueryClient();
   const api = useAPI();
-  const signIn = useMutation(api.auth.signIn());
-  const sent = signIn.isSuccess;
-  const busy = signIn.isPending;
+  const sendOtp = useMutation({
+    ...api.auth.sendOtp(),
+    onSuccess: () => {
+      setStep('otp');
+      setResendCooldown(30);
+    },
+  });
+
+  const verifyOtp = useMutation({
+    ...api.auth.verifyOtp(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: api.keys.profile });
+      await queryClient.invalidateQueries({ queryKey: api.keys.groups.all });
+      await queryClient.refetchQueries({ queryKey: api.keys.profile });
+      await queryClient.refetchQueries({ queryKey: api.keys.groups.all });
+      handleClose(false);
+    },
+  });
 
   const isTestKey =
     !import.meta.env.VITE_TURNSTILE_SITE_KEY ||
@@ -57,15 +76,24 @@ export function SaveAccountModal({ open, onOpenChange }: SaveAccountModalProps) 
     ? '1x00000000000000000000AA'
     : import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
+  // Countdown timer for OTP resend
   useEffect(() => {
-    if (!open) {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // Turnstile widget setup
+  useEffect(() => {
+    if (!open || step !== 'email') {
       return;
     }
 
     let isMounted = true;
 
     if (isTestKey) {
-      // Async state update for test key
       queueMicrotask(() => {
         if (isMounted) setTurnstileToken('valid-test-turnstile-token');
       });
@@ -87,7 +115,6 @@ export function SaveAccountModal({ open, onOpenChange }: SaveAccountModalProps) 
             if (isMounted) setTurnstileToken(null);
           },
           'error-callback': () => {
-            // Local dev fallback
             if (isMounted) setTurnstileToken('local-dev-turnstile-token');
           },
         });
@@ -127,21 +154,37 @@ export function SaveAccountModal({ open, onOpenChange }: SaveAccountModalProps) 
         widgetIdRef.current = null;
       }
     };
-  }, [open, siteKey, isTestKey]);
+  }, [open, step, siteKey, isTestKey]);
 
-  function handleSubmit(e: FormEvent) {
+  function handleSendEmail(e: SyntheticEvent) {
     e.preventDefault();
-    if (!email.trim()) return;
-    signIn.mutate({ email: email.trim(), turnstileToken: turnstileToken || undefined });
+    if (!email.trim() || sendOtp.isPending) return;
+    sendOtp.mutate({ email: email.trim(), turnstileToken: turnstileToken || undefined });
+  }
+
+  function handleVerifyOtp(e?: SyntheticEvent) {
+    if (e) e.preventDefault();
+    const cleanOtp = otp.trim();
+    if (cleanOtp.length !== 6 || verifyOtp.isPending) return;
+    verifyOtp.mutate({ email: email.trim(), otp: cleanOtp });
+  }
+
+  function handleResend() {
+    if (resendCooldown > 0 || sendOtp.isPending) return;
+    sendOtp.mutate({ email: email.trim(), turnstileToken: turnstileToken || undefined });
   }
 
   function handleClose(isOpen: boolean) {
     onOpenChange(isOpen);
     if (!isOpen) {
       setTimeout(() => {
-        signIn.reset();
+        sendOtp.reset();
+        verifyOtp.reset();
         setEmail('');
+        setOtp('');
+        setStep('email');
         setTurnstileToken(null);
+        setResendCooldown(0);
       }, 300);
     }
   }
@@ -154,34 +197,83 @@ export function SaveAccountModal({ open, onOpenChange }: SaveAccountModalProps) 
             <Sparkles className="h-5 w-5" />
             <span className="text-xs font-semibold uppercase tracking-wider">Save your groups</span>
           </div>
-          <DialogTitle>Access anywhere</DialogTitle>
+          <DialogTitle>{step === 'email' ? 'Access anywhere' : 'Enter 6-digit code'}</DialogTitle>
           <DialogDescription className="text-xs">
-            Link an email so you never lose your groups. We'll send you a password-free magic link.
+            {step === 'email'
+              ? "Link an email so you never lose your groups. We'll send you a 6-digit sign-in code."
+              : `We sent a 6-digit code to ${email}. Enter it below to sign in.`}
           </DialogDescription>
         </DialogHeader>
 
-        {sent ? (
-          <div className="space-y-4 py-3 text-center">
+        {step === 'otp' ? (
+          <form onSubmit={handleVerifyOtp} className="space-y-4 py-2">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-teal-600">
               <Mail className="h-6 w-6" />
             </div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold text-slate-900">Check your email</h4>
-              <p className="text-xs text-slate-500">
-                We sent a magic link to <strong className="text-slate-700">{email}</strong>.
-              </p>
+
+            <div className="space-y-2 text-center">
+              <label htmlFor="otp-input" className="text-xs font-semibold text-slate-700">
+                Sign-in code
+              </label>
+              <Input
+                id="otp-input"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="123456"
+                className="text-center font-mono text-2xl font-bold tracking-[0.3em] h-13"
+                value={otp}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/\D/g, '').slice(0, 6);
+                  setOtp(cleaned);
+                  if (cleaned.length === 6) {
+                    verifyOtp.mutate({ email: email.trim(), otp: cleaned });
+                  }
+                }}
+                disabled={verifyOtp.isPending}
+              />
             </div>
+
+            {verifyOtp.error && (
+              <p className="text-xs text-rose-600 font-medium text-center">
+                {String(verifyOtp.error.message || verifyOtp.error)}
+              </p>
+            )}
+
             <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs"
-              onClick={() => signIn.reset()}
+              type="submit"
+              className="w-full font-semibold"
+              disabled={otp.length !== 6 || verifyOtp.isPending}
             >
-              Use a different email
+              {verifyOtp.isPending ? 'Verifying code…' : 'Sign in'}
             </Button>
-          </div>
+
+            <div className="flex items-center justify-between text-xs pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep('email');
+                  setOtp('');
+                  verifyOtp.reset();
+                }}
+                className="text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                Use different email
+              </button>
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resendCooldown > 0 || sendOtp.isPending}
+                className="font-medium text-teal-600 hover:text-teal-700 disabled:text-slate-400 transition-colors"
+              >
+                {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+              </button>
+            </div>
+          </form>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <form onSubmit={handleSendEmail} className="space-y-4 pt-2">
             <div className="space-y-2">
               <label htmlFor="save-email" className="text-xs font-semibold text-slate-700">
                 Email address
@@ -193,19 +285,22 @@ export function SaveAccountModal({ open, onOpenChange }: SaveAccountModalProps) 
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={busy}
-                autoFocus
+                disabled={sendOtp.isPending}
               />
             </div>
             {/* Cloudflare Turnstile verification widget */}
             <div ref={turnstileContainerRef} className="flex items-center justify-center my-2 min-h-[65px]" />
-            {signIn.error && (
+            {sendOtp.error && (
               <p className="text-xs text-rose-600 font-medium">
-                {String(signIn.error.message || signIn.error)}
+                {String(sendOtp.error.message || sendOtp.error)}
               </p>
             )}
-            <Button type="submit" className="w-full font-semibold" disabled={busy || !email.trim()}>
-              {busy ? 'Sending link…' : 'Send magic link'}
+            <Button
+              type="submit"
+              className="w-full font-semibold"
+              disabled={sendOtp.isPending || !email.trim()}
+            >
+              {sendOtp.isPending ? 'Sending code…' : 'Send login code'}
             </Button>
           </form>
         )}

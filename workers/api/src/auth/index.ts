@@ -2,12 +2,12 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { betterAuth } from 'better-auth';
 import { createDb } from '../db';
 import * as schema from './auth-schema';
-import { sendSignInEmail } from './email';
+import { sendOtpEmail } from './email';
 import { authOptions } from './options';
 
 export const createAuth = (env: Env) =>
   betterAuth({
-    ...authOptions(({ email, url }) => sendSignInEmail(env, email, url)),
+    ...authOptions(({ email, otp }) => sendOtpEmail(env, email, otp)),
     database: drizzleAdapter(createDb(env.DB), { provider: 'sqlite', schema }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.API_ORIGIN,

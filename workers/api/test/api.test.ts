@@ -86,19 +86,18 @@ const request = (
     env,
   );
 
-async function sendLink(email: string, ip = '192.0.2.1', turnstileToken = 'valid-test-turnstile-token') {
-  const response = await request('/api/auth/sign-in/magic-link', {
+async function sendOtp(email: string, ip = '192.0.2.1', turnstileToken = 'valid-test-turnstile-token') {
+  const response = await request('/api/auth/email-otp/send-verification-otp', {
     body: {
       email,
-      callbackURL: `${appOrigin}/`,
-      errorCallbackURL: `${appOrigin}/?authError=1`,
+      type: 'sign-in',
       turnstileToken,
     },
     ip,
   });
   assert.equal(response.status, 200, await response.text());
-  const link = emails.at(-1)!.text.match(/https:\/\/\S+/)![0];
-  return new URL(link);
+  const otp = emails.at(-1)!.text.match(/\b\d{6}\b/)![0];
+  return otp;
 }
 
 test('guest creates group, invites friend via link, splits bill, and settles up', async () => {
@@ -255,7 +254,7 @@ test('guest creates group, invites friend via link, splits bill, and settles up'
   assert.equal(deleteRes.status, 200);
 });
 
-test('guest links email via magic link to save account and retain groups', async () => {
+test('guest links email via email OTP to save account and retain groups', async () => {
   // 1. Guest creates a group
   const createGroupRes = await request('/api/groups', {
     body: { name: 'Roadtrip 2026', creatorName: 'Dave' },
@@ -267,13 +266,17 @@ test('guest links email via magic link to save account and retain groups', async
     .split(';')[0];
   const group = await createGroupRes.json();
 
-  // 2. Guest signs in with magic link to save account
-  const link = await sendLink('dave@example.com', '192.0.2.5');
-  const verified = await request(`${link.pathname}${link.search}`, {
+  // 2. Guest requests OTP and verifies it
+  const otp = await sendOtp('dave@example.com', '192.0.2.5');
+  const verified = await request('/api/auth/sign-in/email-otp', {
+    body: {
+      email: 'dave@example.com',
+      otp,
+    },
     cookie: guestCookie,
     ip: '192.0.2.5',
   });
-  assert.equal(verified.status, 302);
+  assert.equal(verified.status, 200);
   const userCookie = verified.headers
     .getSetCookie()
     .find((v) => v.includes('session_token='))!
@@ -300,27 +303,27 @@ test('guest links email via magic link to save account and retain groups', async
 
 test('email requests share a persistent rate limit across auth instances', async () => {
   const initialCount = emails.length;
-  for (let index = 0; index < 5; index++) {
-    await sendLink('limited@example.com', '192.0.2.9');
+  for (let index = 0; index < 3; index++) {
+    await sendOtp('limited@example.com', '192.0.2.9');
   }
-  const limited = await request('/api/auth/sign-in/magic-link', {
+  const limited = await request('/api/auth/email-otp/send-verification-otp', {
     body: {
       email: 'limited@example.com',
-      callbackURL: `${appOrigin}/`,
+      type: 'sign-in',
       turnstileToken: 'valid-test-turnstile-token',
     },
     ip: '192.0.2.9',
   });
   assert.equal(limited.status, 429);
-  assert.equal(emails.length - initialCount, 5);
+  assert.equal(emails.length - initialCount, 3);
 });
 
-test('turnstile protects magic link from automated abuse', async () => {
+test('turnstile protects email OTP from automated abuse', async () => {
   // 1. Missing turnstile token -> 403
-  const missingRes = await request('/api/auth/sign-in/magic-link', {
+  const missingRes = await request('/api/auth/email-otp/send-verification-otp', {
     body: {
       email: 'attacker@example.com',
-      callbackURL: `${appOrigin}/`,
+      type: 'sign-in',
     },
   });
   assert.equal(missingRes.status, 403);
@@ -328,10 +331,10 @@ test('turnstile protects magic link from automated abuse', async () => {
   assert.equal(missingBody.error.code, 'turnstile_failed');
 
   // 2. Invalid turnstile token -> 403
-  const invalidRes = await request('/api/auth/sign-in/magic-link', {
+  const invalidRes = await request('/api/auth/email-otp/send-verification-otp', {
     body: {
       email: 'attacker@example.com',
-      callbackURL: `${appOrigin}/`,
+      type: 'sign-in',
       turnstileToken: 'invalid-turnstile-token',
     },
   });
@@ -352,4 +355,89 @@ test('bodyLimit rejects oversized payloads (>50KB)', async () => {
   const body = await res.json();
   assert.equal(body.error.code, 'payload_too_large');
 });
+
+test('group archiving and unarchiving', async () => {
+  const cookie = 'splitwiser_guest=archiver-guest';
+  const groupRes = await request('/api/groups', {
+    method: 'POST',
+    body: { name: 'Trip to Archive', creatorName: 'Alice' },
+    cookie,
+  });
+  assert.equal(groupRes.status, 201);
+  const group = await groupRes.json();
+  assert.equal(group.archivedAt, null);
+
+  // Archive
+  const archiveRes = await request(`/api/groups/${group.id}/archive`, {
+    method: 'POST',
+    cookie,
+  });
+  assert.equal(archiveRes.status, 200);
+  const archiveData = await archiveRes.json();
+  assert.equal(archiveData.success, true);
+  assert.ok(archiveData.archivedAt);
+
+  // Detail returns archivedAt
+  const detailRes = await request(`/api/groups/${group.id}`, { cookie });
+  const detail = await detailRes.json();
+  assert.equal(detail.group.archivedAt, archiveData.archivedAt);
+
+  // Unarchive
+  const unarchiveRes = await request(`/api/groups/${group.id}/unarchive`, {
+    method: 'POST',
+    cookie,
+  });
+  assert.equal(unarchiveRes.status, 200);
+  const unarchiveData = await unarchiveRes.json();
+  assert.equal(unarchiveData.success, true);
+  assert.equal(unarchiveData.archivedAt, null);
+});
+
+test('member removal restrictions and execution', async () => {
+  const cookie = 'splitwiser_guest=removal-guest';
+  const groupRes = await request('/api/groups', {
+    method: 'POST',
+    body: { name: 'Removals Group', creatorName: 'Owner' },
+    cookie,
+  });
+  const group = await groupRes.json();
+
+  // Add offline member Bob
+  const bobRes = await request(`/api/groups/${group.id}/members`, {
+    method: 'POST',
+    body: { name: 'Bob' },
+    cookie,
+  });
+  assert.equal(bobRes.status, 201);
+  const bob = await bobRes.json();
+
+  // Get detail to find self memberId
+  const detailRes = await request(`/api/groups/${group.id}`, { cookie });
+  const detail = await detailRes.json();
+  const selfMemberId = detail.myMemberId;
+
+  // Cannot remove self
+  const removeSelfRes = await request(`/api/groups/${group.id}/members/${selfMemberId}`, {
+    method: 'DELETE',
+    cookie,
+  });
+  assert.equal(removeSelfRes.status, 400);
+  const selfBody = await removeSelfRes.json();
+  assert.equal(selfBody.error.message, 'You cannot remove yourself from the group.');
+
+  // Bob has 0 balance and 0 paid expenses: removing Bob succeeds
+  const removeBobRes = await request(`/api/groups/${group.id}/members/${bob.id}`, {
+    method: 'DELETE',
+    cookie,
+  });
+  assert.equal(removeBobRes.status, 200);
+  const removeBobData = await removeBobRes.json();
+  assert.equal(removeBobData.success, true);
+
+  // Verify Bob is no longer in group
+  const afterDetailRes = await request(`/api/groups/${group.id}`, { cookie });
+  const afterDetail = await afterDetailRes.json();
+  assert.equal(afterDetail.members.some((m: { id: string }) => m.id === bob.id), false);
+});
+
 

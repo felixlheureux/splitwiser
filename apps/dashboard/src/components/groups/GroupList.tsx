@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, ChevronRight, Plus, Sparkles } from 'lucide-react';
+import { Archive, ArrowRight, ChevronDown, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import type { Me } from '@splitwiser/shared';
 import { useAPI } from '../../hooks/useAPI';
 import { InstallBanner } from '../pwa/InstallBanner';
@@ -19,11 +19,14 @@ export function GroupList({ user, onSelectGroup, onNewGroup, onJoinCode }: Group
   const api = useAPI();
   const listQuery = useQuery(api.groups.list(user.id));
   const [joinCodeInput, setJoinCodeInput] = useState('');
+  const [archivedExpanded, setArchivedExpanded] = useState(false);
 
   const groups = listQuery.data?.groups ?? [];
+  const activeGroups = groups.filter((g) => !g.archivedAt);
+  const archivedGroups = groups.filter((g) => Boolean(g.archivedAt));
   const loading = listQuery.isPending;
 
-  function handleJoinSubmit(e: FormEvent) {
+  function handleJoinSubmit(e: SyntheticEvent) {
     e.preventDefault();
     const cleanCode = joinCodeInput.trim().replace(/^.*\/join\//, '');
     if (!cleanCode) return;
@@ -88,11 +91,11 @@ export function GroupList({ user, onSelectGroup, onNewGroup, onJoinCode }: Group
         </form>
       </div>
 
-      {/* Groups List */}
+      {/* Active Groups List */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Active groups ({groups.length})
+            Active groups ({activeGroups.length})
           </span>
         </div>
 
@@ -100,24 +103,28 @@ export function GroupList({ user, onSelectGroup, onNewGroup, onJoinCode }: Group
           <div className="py-12 text-center text-xs text-slate-400">
             Loading your groups…
           </div>
-        ) : groups.length === 0 ? (
+        ) : activeGroups.length === 0 ? (
           <div className="py-12 px-6 rounded-2xl border border-dashed border-slate-200 bg-white/60 text-center space-y-3">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-teal-600">
               <Sparkles className="h-6 w-6" />
             </div>
             <div className="space-y-1">
-              <h4 className="text-sm font-semibold text-slate-800">No groups yet</h4>
+              <h4 className="text-sm font-semibold text-slate-800">
+                {archivedGroups.length > 0 ? 'No active groups' : 'No groups yet'}
+              </h4>
               <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                Create a group for your next weekend trip, household bills, or group gift.
+                {archivedGroups.length > 0
+                  ? 'All your groups are currently archived. Start a new one or restore an archived group below.'
+                  : 'Create a group for your next weekend trip, household bills, or group gift.'}
               </p>
             </div>
             <Button size="sm" variant="outline" onClick={onNewGroup} className="text-xs font-semibold">
-              Create your first group
+              Create a group
             </Button>
           </div>
         ) : (
           <div className="space-y-2.5">
-            {groups.map((group) => {
+            {activeGroups.map((group) => {
               const formattedDate = new Date(group.createdAt).toLocaleDateString(undefined, {
                 month: 'short',
                 day: 'numeric',
@@ -153,6 +160,73 @@ export function GroupList({ user, onSelectGroup, onNewGroup, onJoinCode }: Group
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {/* Collapsible Archived Groups Section */}
+        {archivedGroups.length > 0 && (
+          <div className="pt-4 border-t border-slate-200/70 space-y-2">
+            <button
+              type="button"
+              onClick={() => setArchivedExpanded((prev) => !prev)}
+              className="w-full flex items-center justify-between p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100/70 transition-colors text-xs font-semibold"
+            >
+              <div className="flex items-center gap-2">
+                <Archive className="h-3.5 w-3.5 text-slate-400" />
+                <span>Archived groups ({archivedGroups.length})</span>
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
+                  archivedExpanded ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {archivedExpanded && (
+              <div className="space-y-2 pt-1">
+                {archivedGroups.map((group) => {
+                  const formattedDate = new Date(group.createdAt).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                  });
+
+                  return (
+                    <Card
+                      key={group.id}
+                      className="cursor-pointer opacity-75 hover:opacity-100 transition-all hover:border-slate-400/50 hover:shadow-sm border-slate-200/80 bg-slate-50/50 active:scale-[0.99]"
+                      onClick={() => onSelectGroup(group.id)}
+                    >
+                      <CardContent className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 truncate pr-2">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-200/70 text-slate-600 font-bold text-sm">
+                            {group.name.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div className="truncate space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-semibold text-slate-800 truncate">
+                                {group.name}
+                              </h4>
+                              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.2 bg-slate-200/80 text-slate-600 rounded">
+                                Archived
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                              <span>Created {formattedDate}</span>
+                              <span>·</span>
+                              <span>Code: {group.inviteCode}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center text-slate-400 shrink-0">
+                          <ChevronRight className="h-4 w-4" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -40,7 +40,7 @@ Splitwiser is designed around a simple philosophy: **splitting a dinner bill or 
 - **Offline Member Support & Seamless Reclaiming**: Add friends who don't have the app yet. Friends can claim their name when joining—and if they clear browser cookies or switch devices, they can reclaim their member slot without lockouts.
 - **Platform-Adaptive PWA Install**: 1-tap install on Android & Desktop, simple 2-step browser menu fallback (`⋮` menu on mobile, Share sheet on iOS, Omnibox icon on Desktop) — with zero confusing desktop-only instructions on phones.
 - **1-Tap Settle Up**: Clear record of repayments that update balances in real time.
-- **Passwordless Account Linking**: Link your email anytime via a password-free magic link delivered via Resend. Seamlessly merges guest groups into your profile.
+- **Passwordless Account Linking**: Link your email anytime via a 6-digit sign-in code delivered via Resend. Works directly inside the installed PWA without browser redirects, seamlessly merging guest groups into your profile.
 - **Multi-Layered Edge Security**: Cloudflare WAF rate limiting, Bot Fight Mode, payload size limits, and Cloudflare Turnstile challenge verification.
 
 ---
@@ -52,7 +52,7 @@ Splitwiser is designed around a simple philosophy: **splitting a dinner bill or 
 | **Frontend PWA** | React 19, Vite, Tailwind CSS v4, shadcn/ui, TanStack Query, Lucide Icons, `vite-plugin-pwa` (Workbox) |
 | **Backend API** | Cloudflare Workers, Hono, Drizzle ORM, Better Auth, Cloudflare Turnstile verification |
 | **Database** | Cloudflare D1 (Serverless SQLite at the edge) |
-| **Email Delivery** | Resend (Single-use magic links) |
+| **Email Delivery** | Resend (6-digit OTP verification codes) |
 | **Infrastructure** | OpenTofu (Terraform), Cloudflare Provider v5, GitLab HTTP remote state backend |
 
 ---

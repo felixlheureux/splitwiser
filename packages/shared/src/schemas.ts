@@ -40,6 +40,7 @@ export const groupSchema = z.object({
   name: z.string(),
   inviteCode: z.string(),
   createdAt: z.string(),
+  archivedAt: z.string().nullable().optional(),
 });
 
 export const createGroupSchema = z.object({

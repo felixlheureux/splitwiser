@@ -35,9 +35,9 @@ export function Features() {
     {
       icon: ShieldCheck,
       badge: "Private & Safe",
-      title: "Passwordless Magic Links",
+      title: "Passwordless 6-Digit Codes",
       description:
-        "No passwords to remember or lose. Secure email authentication powered by Resend and Cloudflare Turnstile bot verification keeps your ledger protected.",
+        "No passwords to remember. Instant 6-digit email codes verify directly inside your installed app on iOS, Android, and desktop without annoying browser redirects.",
     },
     {
       icon: Zap,

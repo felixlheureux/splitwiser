@@ -2,13 +2,24 @@ import { useEffect, useState } from 'react';
 
 const DISMISS_STORAGE_KEY = 'splitwiser_pwa_banner_dismissed';
 
+declare global {
+  interface Window {
+    __deferredPrompt?: BeforeInstallPromptEvent | null;
+  }
+}
+
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
 export function usePWAInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(() => {
+    if (typeof window !== 'undefined' && window.__deferredPrompt) {
+      return window.__deferredPrompt;
+    }
+    return null;
+  });
   const [isInstalled, setIsInstalled] = useState(() => {
     if (typeof window === 'undefined') return false;
     return (
@@ -34,20 +45,34 @@ export function usePWAInstall() {
   useEffect(() => {
     if (isInstalled) return;
 
+    if (window.__deferredPrompt) {
+      setDeferredPrompt(window.__deferredPrompt);
+    }
+
+    function handlePromptReady() {
+      if (window.__deferredPrompt) {
+        setDeferredPrompt(window.__deferredPrompt);
+      }
+    }
+
     function handleBeforeInstallPrompt(e: Event) {
       e.preventDefault();
+      window.__deferredPrompt = e as BeforeInstallPromptEvent;
       setDeferredPrompt(e as BeforeInstallPromptEvent);
     }
 
     function handleAppInstalled() {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      window.__deferredPrompt = null;
     }
 
+    window.addEventListener('pwa-prompt-ready', handlePromptReady);
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
@@ -56,29 +81,31 @@ export function usePWAInstall() {
   async function promptInstall(): Promise<boolean> {
     if (isInstalled) return false;
 
+    const promptEvent = deferredPrompt || (typeof window !== 'undefined' ? window.__deferredPrompt : null);
+
+    if (promptEvent) {
+      try {
+        await promptEvent.prompt();
+        const choice = await promptEvent.userChoice;
+        if (choice.outcome === 'accepted') {
+          setIsInstalled(true);
+          setDeferredPrompt(null);
+          if (typeof window !== 'undefined') window.__deferredPrompt = null;
+          setShowIOSGuide(false);
+          return true;
+        }
+      } catch {
+        // Ignore user cancellation
+      }
+      return false;
+    }
+
     if (isIOS) {
       setShowIOSGuide(true);
       return false;
     }
 
-    if (!deferredPrompt) {
-      // If browser doesn't support beforeinstallprompt but user clicked, show instructions
-      setShowIOSGuide(true);
-      return false;
-    }
-
-    try {
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
-        setIsInstalled(true);
-        setDeferredPrompt(null);
-        setShowIOSGuide(false);
-        return true;
-      }
-    } catch {
-      // Ignore user cancellation
-    }
+    setShowIOSGuide(true);
     return false;
   }
 

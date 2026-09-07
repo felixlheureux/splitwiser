@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SyntheticEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { UserPlus } from 'lucide-react';
 import { useAPI } from '../../hooks/useAPI';
@@ -23,7 +23,7 @@ export function AddMemberModal({ open, onOpenChange, groupId }: AddMemberModalPr
   const api = useAPI();
   const addMember = useMutation(api.groups.addMember(groupId));
 
-  function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: SyntheticEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     addMember.mutate(
@@ -64,7 +64,6 @@ export function AddMemberModal({ open, onOpenChange, groupId }: AddMemberModalPr
               onChange={(e) => setName(e.target.value)}
               disabled={addMember.isPending}
               maxLength={80}
-              autoFocus
             />
           </div>
 

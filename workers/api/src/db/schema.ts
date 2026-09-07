@@ -6,6 +6,7 @@ export const groupsTable = sqliteTable('groups', {
   inviteCode: text('invite_code').notNull().unique(),
   createdBy: text('created_by').notNull(),
   createdAt: text('created_at').notNull(),
+  archivedAt: text('archived_at'),
 });
 
 export const groupMembersTable = sqliteTable(

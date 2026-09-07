@@ -5,8 +5,8 @@ import { ApiError, errorResponse, type ApiEnv } from '../errors';
 
 const auth = new Hono<ApiEnv>();
 
-// Protect magic-link sign-in with Turnstile verification
-auth.post('/api/auth/sign-in/magic-link', async (c) => {
+// Protect OTP generation with Turnstile verification
+auth.post('/api/auth/email-otp/send-verification-otp', async (c) => {
   const headerToken = c.req.header('cf-turnstile-response') || c.req.header('x-turnstile-token');
 
   let bodyJson: Record<string, unknown> = {};
