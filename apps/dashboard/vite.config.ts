@@ -41,7 +41,7 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        theme_color: '#ffffff',
+        theme_color: '#0d9488',
         background_color: '#ffffff',
         launch_handler: {
           client_mode: 'navigate-existing',

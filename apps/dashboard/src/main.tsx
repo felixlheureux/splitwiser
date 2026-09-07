@@ -25,14 +25,10 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     navigator.serviceWorker
       .register('/sw.js')
       .then((reg) => {
-        // Proactively check for updates and refresh system theme color when returning to the app
+        // Proactively check for updates when returning to the app
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') {
             void reg.update();
-            const metaTheme = document.querySelector('meta[name="theme-color"]');
-            if (metaTheme) {
-              metaTheme.setAttribute('content', '#ffffff');
-            }
           }
         });
       })
