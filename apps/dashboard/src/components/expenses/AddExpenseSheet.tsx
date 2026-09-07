@@ -102,7 +102,7 @@ export function AddExpenseSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-6">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center gap-2 text-teal-600 mb-1">
             <Receipt className="h-5 w-5" />
@@ -166,13 +166,24 @@ export function AddExpenseSheet({
             e.stopPropagation();
             void form.handleSubmit();
           }}
-          className="space-y-4 pt-2"
+          className="space-y-4 pt-2 pb-2"
         >
           {/* Amount input */}
           <form.Field
             name="amount"
             validators={{
               onChange: ({ value }) => {
+                if (!value) return undefined;
+                const parsed = parseFloat(value);
+                if (isNaN(parsed) || parsed <= 0) return 'Enter a valid amount';
+                return undefined;
+              },
+              onBlur: ({ value }) => {
+                const parsed = parseFloat(value);
+                if (!value || isNaN(parsed) || parsed <= 0) return 'Enter a valid amount';
+                return undefined;
+              },
+              onSubmit: ({ value }) => {
                 const parsed = parseFloat(value);
                 if (!value || isNaN(parsed) || parsed <= 0) return 'Enter a valid amount';
                 return undefined;
@@ -197,6 +208,7 @@ export function AddExpenseSheet({
                     className="pl-9 text-lg font-bold"
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
                     disabled={createExpense.isPending}
                   />
                 </div>
@@ -213,7 +225,8 @@ export function AddExpenseSheet({
           <form.Field
             name="description"
             validators={{
-              onChange: ({ value }) => (!value.trim() ? 'Description is required' : undefined),
+              onBlur: ({ value }) => (!value.trim() ? 'Description is required' : undefined),
+              onSubmit: ({ value }) => (!value.trim() ? 'Description is required' : undefined),
             }}
           >
             {(field) => (
@@ -226,6 +239,7 @@ export function AddExpenseSheet({
                   placeholder={splitType === 'settlement' ? 'e.g. Paid cash, Venmo' : 'e.g. Dinner, Groceries, Hotel'}
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
+                  onBlur={field.handleBlur}
                   disabled={createExpense.isPending}
                   maxLength={120}
                 />
@@ -379,7 +393,7 @@ export function AddExpenseSheet({
 
           <Button
             type="submit"
-            className="w-full font-semibold h-12 text-base mt-2"
+            className="w-full font-semibold h-12 text-base mt-4 mb-2 shadow-xs"
             disabled={createExpense.isPending}
           >
             {createExpense.isPending
