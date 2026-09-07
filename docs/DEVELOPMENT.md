@@ -54,7 +54,7 @@ pnpm --filter api dev
 ```
 
 Migrations are ordered deliberately: Better Auth's generated tables are applied
-first, application tables second, and same-group integrity triggers third. The
+first and application tables with composite foreign keys second. The
 remote command is manual and must only be used after reviewing the migration:
 
 ```bash
@@ -65,7 +65,7 @@ Never use `--remote` for routine local development.
 
 ### Cloudflare Worker
 
-When the API Worker is scaffolded, keep local secrets in a Worker-specific
+Keep local secrets in a Worker-specific
 `.dev.vars` file and commit only a redacted `.dev.vars.example`:
 
 ```dotenv
@@ -83,6 +83,7 @@ use the `VITE_` prefix because they must not reach the browser bundle.
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm test
 ```
 
 Infrastructure is managed with OpenTofu only. Local checks do not connect to
@@ -104,3 +105,16 @@ tokens in committed files.
 Keep `pnpm-lock.yaml` changes with dependency changes. Do not install packages
 from inside an individual workspace unless the command is intentionally scoped,
 for example `pnpm --filter dashboard add <package>`.
+
+## Adding dependencies
+
+Use unversioned install commands and let pnpm select the version:
+
+```bash
+pnpm --filter api add zod
+pnpm --filter dashboard add @tanstack/react-query
+```
+
+Commit the manifest and root lockfile together. React UI goes in the dashboard's
+`components/`; API/data logic goes in `features/` and is exposed by `useAPI()`.
+The backend keeps its `auth/`, `routes/`, database files, and `middleware/`.

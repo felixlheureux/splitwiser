@@ -22,7 +22,7 @@ does not move money and it is not a budgeting product.
 | Frontend hosting            | Separate static Pages projects for the landing site and the complete PWA                 |
 | Source and deployment       | GitHub-hosted source; authorized operators deploy manually with OpenTofu and Wrangler    |
 | Infrastructure state        | GitLab-managed OpenTofu remote state; never committed to the repository                  |
-| Authentication              | Better Auth email OTP presented as a sign-in link plus a visible code fallback           |
+| Authentication              | Better Auth magic link with automatic sign-in and redirect           |
 | Email                       | Resend through a provider adapter                                                        |
 | Money                       | Integer minor units, one ISO 4217 currency per group                                     |
 | Ledger                      | One payer; equal or exact-amount splits; balances always derived                         |
@@ -150,7 +150,7 @@ An append-only record of a meaningful group mutation and its actor.
 
 ### 4.1 Included at public launch
 
-- Email sign-in link with manual code fallback.
+- Email sign-in link with automatic login and redirect.
 - Persistent secure sessions and logout.
 - First-login profile name.
 - Create, rename, soft-delete, restore, and export a group.
@@ -195,22 +195,20 @@ usage.
 ### 5.1 First sign-in
 
 1. The user enters only their email.
-2. The API returns the same generic response whether the account exists or not.
-3. The email contains:
-   - a primary “Continue to Splitwiser” link; and
-   - an eight-digit code for the installed-PWA/browser-context fallback.
-4. The link opens a static confirmation route. The secret is in the URL
-   fragment, is copied to memory, and is removed from the visible URL
-   immediately.
-5. The confirmation route does not consume the code on GET and does not
-   auto-submit. It requires an explicit Continue tap so mail scanners cannot
-   consume it.
-6. The confirmation action POSTs the email and code to Better Auth. A valid,
-   unused code creates or restores the user and creates the session.
-7. A new user supplies a display name before entering the product.
+2. The API returns the same accepted response whether the account exists or not.
+3. The email contains a “Sign in to Splitwiser” link, with no OTP or code input.
+4. Clicking the link calls Better Auth's magic-link verification endpoint. It
+   consumes the token, verifies email ownership, sets the API session cookie,
+   and redirects straight to the app. No second confirmation tap is required.
+5. A new user supplies a display name before creating a group.
 
-The code expires after ten minutes, allows three attempts, is stored hashed,
-and is rotated when a new email is requested.
+Links expire after ten minutes, are single-use, and are stored hashed. An
+expired or already-used link returns to the app with an option to request a new
+one. Requesting a new link does not invalidate other unexpired links.
+
+This deliberately uses Better Auth's built-in flow to keep the weekend project
+small. A mail service that follows verification links can consume one before
+the user; requesting a fresh link is the recovery path.
 
 ### 5.2 Returning user
 
@@ -221,22 +219,20 @@ and is rotated when a new email is requested.
 - A missing or expired session routes to email sign-in without deleting a local
   offline outbox.
 
-### 5.3 iOS link fallback
+### 5.3 Browser and installed-app behavior
 
-An installed iOS Home Screen app does not continuously share storage/cookies
-with Safari. A link tapped in Mail can therefore authenticate Safari rather than
-the installed app.
-
-The check-email screen always includes a code input. The email explicitly says:
-if the link opens a different browser, return to the app and enter the code.
-This is an MVP requirement, not an optional enhancement.
+The link signs into the browser context in which it opens and redirects to the
+web app. On iOS, Mail may open Safari rather than an installed Home Screen app,
+and those contexts may not share sessions. The MVP has no numeric-code fallback
+or cross-browser session transfer. Users can continue in the browser opened by
+the link.
 
 ### 5.4 Invite continuation through authentication
 
 - The client captures an invite credential, immediately replaces the visible
   URL with a clean route, and stores the pending invite locally with a short
   expiry.
-- If authentication is needed, successful code entry resumes that invite.
+- If authentication is needed, successful link sign-in resumes that invite in the same browser context.
 - Only allowlisted in-app destinations may be used after authentication. Never
   accept an arbitrary callback URL.
 - If the link opens in a storage-isolated context, the user can authenticate
@@ -388,6 +384,8 @@ attach group/user data. Open with noopener and noreferrer.
 - Store and transmit integer minor units only.
 - Keep user-entered money as a decimal string until validated and converted
   digit by digit. Never use parseFloat(amount) multiplied by 100.
+- Initially support CAD, USD, EUR, GBP, JPY, AUD, and CHF. The API derives
+  the minor-unit exponent from the supported currency code.
 - Currency metadata includes its ISO code and minor-unit exponent. Not every
   currency has two decimal places.
 - Format for display with Intl.NumberFormat.
@@ -655,7 +653,7 @@ flowchart LR
   SW["Service worker<br/>static app shell"]
   IDB["IndexedDB<br/>read cache + outbox"]
   API["api.splitwiser.app<br/>Hono Worker"]
-  Auth["Better Auth module<br/>email OTP + sessions"]
+  Auth["Better Auth module<br/>magic links + sessions"]
   D1[("Cloudflare D1")]
   Mail["Resend API"]
 
@@ -708,74 +706,37 @@ deployment resource names.
 - The landing page links to dash.splitwiser.app but never receives or shares
   application cookies.
 
-Suggested layout:
+Current layout:
 
 ```text
-apps/
-  landing/
-    index.html
-    public/
-      robots.txt
-      sitemap.xml
-    vite.config.ts
-  dashboard/
-    src/
-      routes/
-      components/
-      features/
-      lib/
-      offline/
-    public/
-      _headers
-    tests/
-    vite.config.ts
-  api/
-    src/
-      index.ts
-      auth/
-      routes/
-      services/
-      repositories/
-    migrations/
-    tests/
-    wrangler.jsonc
-packages/
-  shared/
-    src/
-      schemas/
-      types/
-      money/
-      dates/
-      errors/
-      constants/
-      index.ts
-    package.json
-    tsconfig.json
-infra/
-  cloudflare/
-    backend.tf
-    providers.tf
-    main.tf
-    outputs.tf
-    .terraform.lock.hcl
-  .github/
-package.json
-pnpm-workspace.yaml
-pnpm-lock.yaml
+apps/dashboard/src/
+  App.tsx                 Session gate and page composition
+  components/auth/        Email sign-in UI
+  components/profile/     Profile onboarding UI
+  components/groups/      Group list and creation UI
+  hooks/useAPI.ts          React access to the API object
+  features/api/           HTTP requests, keys, query/mutation options
+workers/api/
+  src/app.ts              Middleware and route composition
+  src/auth/               Better Auth, email, schema generation
+  src/routes/             Profile, group, and health HTTP routes
+  src/db.ts               Drizzle client factory
+  src/app-schema.ts       Application table definitions
+  src/middleware/         Cross-cutting HTTP middleware
+  migrations/             Database migrations
+  test/                   API and database regression tests
+packages/shared/src/
+  schemas/                Request/response schemas and inferred types
+  routes.ts               Shared HTTP paths
+  errors.ts               Shared API error class
+infra/cloudflare/         OpenTofu infrastructure
 ```
 
-Use one pnpm workspace and one pnpm-lock.yaml; workspace packages reference
-@splitwiser/shared with workspace:\*. Do not add Turborepo, Nx, separate
-repositories, or an internal service layer.
-
-The private, ESM-only @splitwiser/shared package owns everything that is both
-useful and safe in the browser and Worker: Zod request/response/domain schemas,
-their inferred TypeScript types, branded IDs, API error envelopes and codes,
-money/split/date utilities, and shared constants. It must stay platform-neutral
-and side-effect-free. It may depend on Zod, but it must not import React, DOM or
-service-worker APIs, Hono, Better Auth, Drizzle/D1, or secrets. Database schema
-and repositories remain API-only; UI components and IndexedDB code remain
-dashboard-only.
+React UI belongs in components/. Frontend API/data logic belongs in features/.
+Components use useAPI() for typed TanStack query/mutation options, routes, and
+keys. Those options own cache updates and invalidation; components retain form
+state. Group query keys include the user ID, and session loss clears private
+reads. Keep the backend's small auth/routes/database structure.
 
 ### 10.2 Worker responsibilities
 
@@ -793,6 +754,16 @@ dashboard-only.
 The Worker does not keep request or user state in module globals.
 
 ### 10.3 D1 strategy
+
+Keep the backend as Hono route modules with direct Drizzle calls, one database
+factory, shared input validation, and a small auth/email module. Avoid separate
+controller, service, and repository layers until there is an actual need.
+
+Application SQL migrations are the source of truth for database constraints.
+Composite foreign keys enforce that memberships, payers, split participants,
+and settlement parties belong to the same group, without integrity triggers.
+Participants remain separate from memberships so offline people and retained
+financial history do not require login accounts.
 
 - Start with one database; the 500 MB per-database Free limit is sufficient for
   the capped MVP.
@@ -816,7 +787,7 @@ The Worker does not keep request or user state in module globals.
 - Store authentication, invite-signing, and Resend values with Wrangler
   secrets, never in source or configuration.
 - Enable sampled observability only on the API Worker and emit structured JSON
-  without email addresses, invite credentials, OTPs, cookies, or financial
+  without email addresses, invite credentials, sign-in tokens, cookies, or financial
   descriptions.
 - The landing and dashboard are ordinary Vite static builds uploaded with
   wrangler pages deploy. They have no bindings, secrets, Functions, or Worker
@@ -886,26 +857,21 @@ than attempting an unsafe automatic down migration.
 
 Use Better Auth with:
 
-- its Drizzle adapter against D1;
-- the Email OTP plugin rather than a GET-consuming magic-link flow;
-- eight digits, ten-minute expiry, three attempts;
-- hashed OTP storage;
-- D1-backed rate-limit storage;
-- cf-connecting-ip as the trusted client IP header;
+- its Drizzle adapter against D1, explicitly supplied the generated auth schema;
+- the built-in Magic Link plugin, with automatic verification and redirect;
+- ten-minute expiry, hashed tokens, and atomic single-use verification;
+- D1-backed rate-limit storage and cf-connecting-ip as the trusted IP header;
 - secure, HttpOnly, host-only, SameSite=Lax cookies;
 - a 90-day session expiry and 30-day update age;
 - UUID identifiers;
 - base URL https://api.splitwiser.app;
-- https://dash.splitwiser.app as the explicit trusted browser origin;
-- no disabled CSRF/origin checks.
+- https://dash.splitwiser.app as the sole trusted dashboard origin in production;
+- enabled CSRF/origin checks.
 
-The email OTP callback constructs a product-facing sign-in link whose fragment
-contains the same OTP shown in the message. This provides one email and one
-challenge for both link and manual-code paths.
-
-Prefer Better Auth's minimal import if its current plugin surface supports the
-configuration, and verify the bundled Worker remains below the Free-plan size
-and CPU limits.
+Runtime and schema generation share the same auth options. The email callback
+sends Better Auth's generated verification URL. It sets the session cookie and
+redirects to the dashboard without a code or extra Continue screen. Product
+routes forward renewed session cookies when checking authentication.
 
 ### 11.2 Why not custom auth
 
@@ -921,26 +887,13 @@ replay would still require server state.
 
 ### 11.3 Email provider
 
-Use Resend for transactional email:
+Use Resend for transactional email. A small sendSignInEmail(env, email, url)
+function calls its HTTPS API with fetch and sends a plain-text sign-in link.
+Await delivery acceptance so a failed send does not show a misleading success
+screen. Do not add a provider framework or email queue at this stage.
 
-| Provider                 | Current free allowance                        | Decision       |
-| ------------------------ | --------------------------------------------- | -------------- |
-| Resend                   | 3,000/month, 100/day, three domains           | MVP default    |
-| Cloudflare Email Sending | Public outbound sending requires Workers Paid | Not compatible |
-
-Use a tiny interface:
-
-```ts
-type SendSignInEmail = (input: {
-  to: string;
-  link: string;
-  code: string;
-  expiresAt: Date;
-}) => Promise<void>;
-```
-
-Call Resend's HTTPS API directly with fetch rather than adding a Node-focused
-SDK. Send plain-text and minimal HTML variants with tracking disabled.
+Resend requires a verified sending domain before it can send to arbitrary
+recipients. Provider credentials remain Worker secrets.
 
 ### 11.4 Domain configuration
 
@@ -953,9 +906,9 @@ The production hosts are fixed:
   Configure Resend's SPF, DKIM, and DMARC records for the verified
   `splitwiser.app` sending domain
   and use a sender such as login@splitwiser.app. Sign-in links target
-  https://dash.splitwiser.app/auth/continue. They never target the sending domain,
-  and the confirmation page exchanges its code with api.splitwiser.app. Session
-  cookies remain host-only to api.splitwiser.app.
+  https://api.splitwiser.app/api/auth/magic-link/verify and redirect to
+  https://dash.splitwiser.app after verification. Session cookies remain
+  host-only to api.splitwiser.app.
 
 ### 11.5 Dashboard/API cross-origin contract
 
@@ -976,18 +929,17 @@ subdomains through CORS.
 
 ### 11.6 Abuse and delivery controls
 
-- Always return a generic accepted response for an email request.
-- Rate limit by IP and an HMAC of normalized email, not module memory.
-- Add a global daily send budget below the provider's hard limit.
-- Require Cloudflare Turnstile after suspicious/repeated attempts; it may be
-  enabled for every request if public abuse warrants it.
-- Do not send more than one active challenge per email; resending rotates it.
-- Use ctx.waitUntil for sending and log only provider message ID/status.
-- Never retry hard bounces. Respect provider suppression results.
-- Use exponential retry only for transient provider failures.
-- Keep link/code pages no-store and no-referrer.
-- Do not put OTPs or emails in query parameters, analytics, or logs.
-- Provide “Log out this device” and “Log out all devices.”
+- Use the same accepted response for new and existing accounts.
+- Persist Better Auth rate limits in D1; magic-link endpoints allow five
+  requests per minute per IP and endpoint.
+- Keep tokens out of application logs and analytics. Verification URLs contain
+  a token query parameter required by Better Auth; never log those URLs.
+- Auth responses use no-store and no-referrer headers.
+- Invalid, expired, or consumed links redirect to a recoverable sign-in error.
+- Retain session logout and logout-all support.
+
+A global send budget and CAPTCHA can be added if public usage requires them;
+they are not extra services required for the initial weekend implementation.
 
 ## 12. Persistent data model
 
@@ -1076,6 +1028,7 @@ deleted_at / deleted_by_membership_id nullable
 
 ```text
 expense_id foreign key
+group_id foreign key (same group as expense and participant)
 participant_id foreign key
 amount_minor integer
 allocation_order integer
@@ -1175,14 +1128,14 @@ expose bearer tokens to client JavaScript.
 ### 13.1 Auth surface
 
 ```text
-POST /api/auth/email-otp/send-verification-otp
-POST /api/auth/sign-in/email-otp
+POST /api/auth/sign-in/magic-link
+GET  /api/auth/magic-link/verify
 GET  /api/auth/get-session
 POST /api/auth/sign-out
 POST /api/auth/revoke-sessions
 ```
 
-The client uses only the sign-in purpose. Password and social endpoints remain
+The client requests only magic-link sign-in. Password and social endpoints remain
 disabled.
 
 ### 13.2 Profile
@@ -1291,7 +1244,7 @@ request throttling, and 503 plus Retry-After for exhausted free capacity.
 | PWA                | vite-plugin-pwa generateSW                       | Manifest, precache, controlled updates                         |
 | API                | Hono                                             | Workers-native routing/middleware and typed client option      |
 | SQL                | Drizzle ORM + drizzle-kit                        | Typed schema/query layer and reviewable migrations             |
-| Auth               | Better Auth Email OTP                            | Self-hosted session/security lifecycle                         |
+| Auth               | Better Auth Magic Link                            | Self-hosted session/security lifecycle                         |
 | Unit/integration   | Vitest + Testing Library + MSW                   | Fast domain and UI tests                                       |
 | Property testing   | fast-check                                       | Money/split/balance/idempotency invariants                     |
 | End to end         | Playwright Chromium + WebKit                     | Online/offline and browser coverage                            |
@@ -1320,8 +1273,8 @@ splitwiser.app/terms                    terms
 
 dash.splitwiser.app/                    My Groups
 dash.splitwiser.app/auth                enter email
-dash.splitwiser.app/auth/check-email    code entry and resend
-dash.splitwiser.app/auth/continue       scanner-safe link confirmation
+dash.splitwiser.app/auth/check-email    check inbox and resend
+api.splitwiser.app/api/auth/magic-link/verify  automatic verification and redirect
 dash.splitwiser.app/onboarding          first verified name
 dash.splitwiser.app/join                cleaned invite continuation
 dash.splitwiser.app/groups/new          create group
@@ -1391,7 +1344,7 @@ Every data screen defines:
 ### 16.1 Authentication/session
 
 - Verify email before creating trusted product access.
-- Hash OTPs and use single-use verification records.
+- Hash magic-link tokens and use single-use verification records.
 - Use cryptographically secure random UUIDs/bytes; never Math.random.
 - Use Secure, HttpOnly, SameSite=Lax, Path=/ host-only cookies.
 - Enforce trusted Origin/Fetch Metadata on cookie-authenticated mutations.
@@ -1511,12 +1464,12 @@ integration tests with mocks for transactional correctness.
 
 Authentication:
 
-- Unknown email cannot obtain a session before valid code exchange.
+- Unknown email cannot obtain a session before valid link verification.
 - Request response does not disclose whether an account exists.
-- Used, expired, replaced, and over-attempted codes fail.
-- Loading the email link without tapping Continue does not consume it.
-- Code entry signs into an already-installed iOS PWA when the link opened in
-  Safari.
+- Used and expired links fail; excessive requests are rate limited.
+- Clicking the email link sets a session and redirects to the app automatically.
+- A new account must save a valid display name before group creation.
+- iOS links can be used in the browser context opened by Mail.
 - Logout all devices invalidates every session.
 
 Groups and identity:
@@ -1589,10 +1542,11 @@ Accessibility release gate:
   OpenTofu, migrations, and Wrangler deployments manually from a trusted
   environment while GitLab stores only the remote OpenTofu state.
 - Add shadcn shell, Router, Query, Hono, Drizzle, and migrations.
-- Configure Better Auth email-code/link flow, sessions, abuse controls.
+- Configure Better Auth magic-link flow, sessions, and database rate limits.
 - Add base manifest/service worker and auth physical-device spike.
 
-The iOS link/code spike is an early gate, not end-of-project polish.
+Check the browser opened by email links on iOS early; seamless transfer into an
+installed PWA is outside the MVP.
 
 ### Milestone 2 — groups and identity
 
@@ -1663,7 +1617,7 @@ Platform:
 
 Authentication and email:
 
-- [Better Auth Email OTP](https://better-auth.com/docs/plugins/email-otp)
+- [Better Auth Magic Link](https://better-auth.com/docs/plugins/magic-link)
 - [Better Auth security](https://better-auth.com/docs/reference/security)
 - [Better Auth rate limits](https://better-auth.com/docs/concepts/rate-limit)
 - [Better Auth Hono/Workers integration](https://better-auth.com/docs/integrations/hono)

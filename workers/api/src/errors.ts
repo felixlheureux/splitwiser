@@ -1,50 +1,14 @@
 import type { Context } from 'hono';
-
-export type ApiErrorCode =
-  | 'auth_required'
-  | 'forbidden'
-  | 'not_found'
-  | 'invalid_request'
-  | 'internal_error';
-
-type FieldErrors = Record<string, string[]>;
+import { ApiError } from '@splitwiser/shared';
+export { ApiError } from '@splitwiser/shared';
 
 export type ApiEnv = {
   Bindings: Env;
   Variables: { requestId: string };
 };
 
-export class ApiError extends Error {
-  readonly code: ApiErrorCode;
-  readonly status:
-    | 400
-    | 401
-    | 403
-    | 404
-    | 409
-    | 422
-    | 429
-    | 500
-    | 503;
-  readonly fieldErrors?: FieldErrors;
-
-  constructor(
-    code: ApiErrorCode,
-    message: string,
-    status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 | 503,
-    fieldErrors?: FieldErrors,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-    this.code = code;
-    this.status = status;
-    this.fieldErrors = fieldErrors;
-  }
-}
-
 export const errorResponse = (c: Context<ApiEnv>, error: ApiError) =>
-  c.json(
-    {
+  new Response(JSON.stringify({
       error: {
         code: error.code,
         message: error.message,
@@ -53,6 +17,4 @@ export const errorResponse = (c: Context<ApiEnv>, error: ApiError) =>
           : {}),
         requestId: c.get('requestId'),
       },
-    },
-    error.status,
-  );
+    }), { status: error.status, headers: { 'Content-Type': 'application/json' } });

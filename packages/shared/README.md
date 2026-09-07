@@ -6,7 +6,8 @@ Platform-neutral contracts shared by the dashboard and API Worker.
 
 - Zod request and response schemas
 - Inferred TypeScript types
-- API error envelopes
+- HTTP route constants used by the Worker and dashboard
+- The common `ApiError` class and `ApiErrorResponse` JSON envelope type
 - IDs, dates, currencies, and domain validation
 
 ## Must not own

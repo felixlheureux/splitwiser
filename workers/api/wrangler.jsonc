@@ -7,12 +7,14 @@
   "workers_dev": true,
   "observability": {
     "enabled": true,
+    "redact_query_string": true,
     "logs": {
       "head_sampling_rate": 1,
     },
   },
   "vars": {
-    "API_ORIGIN": "http://localhost:8787",
+    "API_ORIGIN": "https://api.splitwiser.app",
+    "APP_ORIGIN": "https://dash.splitwiser.app",
   },
   "d1_databases": [
     {
@@ -21,7 +23,4 @@
       "database_id": "replace-with-cloudflare-d1-database-id",
     },
   ],
-  "triggers": {
-    "crons": ["0 3 * * *"],
-  },
 }

@@ -4,17 +4,31 @@ import { ApiError, errorResponse, type ApiEnv } from './errors';
 import { corsMiddleware } from './middleware/cors';
 import { errorHandler } from './middleware/error-handler';
 import { requestIdMiddleware } from './middleware/request-id';
+import expenses from './routes/expenses';
 import groups from './routes/groups';
 import health from './routes/health';
+import me from './routes/me';
+import members from './routes/members';
+
+import { getIdentity } from './auth/session';
 
 const app = new Hono<ApiEnv>();
 
 app.use('*', requestIdMiddleware);
 app.use('*', corsMiddleware);
+app.use('/api/*', async (c, next) => {
+  c.header('Cache-Control', 'no-store');
+  c.header('Referrer-Policy', 'no-referrer');
+  await getIdentity(c);
+  await next();
+});
 
 app.route('/health', health);
-app.route('/api/v1/health', health);
-app.route('/api/v1', groups);
+app.route('/api/health', health);
+app.route('/', me);
+app.route('/', groups);
+app.route('/', members);
+app.route('/', expenses);
 
 app.all('/api/auth/*', (c) => createAuth(c.env).handler(c.req.raw));
 

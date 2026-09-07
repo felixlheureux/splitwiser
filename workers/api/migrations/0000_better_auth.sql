@@ -53,3 +53,16 @@ CREATE TABLE `verification` (
 );
 --> statement-breakpoint
 CREATE INDEX `verification_identifier_idx` ON `verification` (`identifier`);
+--> statement-breakpoint
+CREATE TABLE `rate_limit` (
+  `id` text PRIMARY KEY NOT NULL,
+  `key` text NOT NULL,
+  `count` integer NOT NULL,
+  `last_request` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `rate_limit_key_unique` ON `rate_limit` (`key`);
+
+CREATE INDEX session_by_expiry ON session(expires_at);
+CREATE INDEX verification_by_expiry ON verification(expires_at);
+CREATE INDEX rate_limit_by_last_request ON rate_limit(last_request);

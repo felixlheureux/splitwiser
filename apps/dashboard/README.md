@@ -1,32 +1,42 @@
-# React + TypeScript + Vite
+# Splitwiser dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A small React + Vite PWA. The current UI supports email-link sign-in, a first
+display name, group creation/listing, and sign-out. Ledger screens come later.
 
-Currently, two official plugins are available:
+Run `pnpm dev` from the repository root, alongside `pnpm dev:api`. Copy the root
+`.env.example` to `.env`; `VITE_API_BASE_URL` points to the API, normally
+`http://localhost:8787` during development. Requests include the API’s session
+cookie. No authentication tokens are stored in browser storage.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Enter your email to receive a sign-in link. Opening the email link verifies it
+at the API and redirects straight back to the dashboard. Expired or used links
+show a message with a form to request another. When returning to the original
+email-entry tab, it checks whether you have signed in in another tab.
 
-## React Compiler
+For a production build, set `VITE_API_BASE_URL` to the deployed API origin before
+running `pnpm --filter dashboard build`. The API must trust the dashboard’s
+origin for credentialed requests and authentication redirects.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Checks: `pnpm --filter dashboard lint` and `pnpm --filter dashboard build`.
+The build generates the web manifest and a service worker that caches the app
+shell. API responses are not cached; group operations currently require a
+connection.
 
-## Expanding the Oxlint configuration
+## Structure and API usage
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+React UI lives in `src/components/{auth,profile,groups}`. `App.tsx` composes
+those components. `src/features/api` contains HTTP requests, query keys, and
+TanStack query/mutation options. `src/hooks/useAPI.ts` exposes that API object:
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```tsx
+const api = useAPI();
+const groups = useQuery(api.groups.list(user.id));
+const createGroup = useMutation(api.groups.create(user.id));
+
+// Also available: api.routes.groups and api.keys.groups.list(user.id).
+createGroup.mutate({ name: 'Weekend', currencyCode: 'CAD' });
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+API options handle profile cache updates, group invalidation, and sign-out
+cleanup. Components do not repeat routes, keys, or request effects. Group keys
+include the user ID. `pnpm --filter dashboard test` checks cache behavior.

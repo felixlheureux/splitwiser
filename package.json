@@ -16,7 +16,8 @@
     "typecheck": "pnpm -r --if-present run typecheck",
     "db:migrate:local": "pnpm --filter api db:migrate:local",
     "db:migrate:remote": "pnpm --filter api db:migrate:remote",
-    "check": "pnpm lint && pnpm typecheck && pnpm build",
+    "test": "pnpm -r --if-present run test",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "infra:fmt": "tofu -chdir=infra/cloudflare fmt",
     "infra:validate": "tofu -chdir=infra/cloudflare validate",
     "infra:plan": "tofu -chdir=infra/cloudflare plan"
