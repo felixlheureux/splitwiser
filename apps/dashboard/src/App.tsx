@@ -22,7 +22,8 @@ export function App() {
       closeOverlay();
       setActiveGroupId(null);
       setJoinCode(null);
-      window.history.replaceState({ appRoot: true }, '', '/');
+      window.history.replaceState({ isGuard: true }, '', '/');
+      window.history.pushState({ appRoot: true }, '', '/');
       await profile.refetch();
     },
   });
@@ -62,10 +63,27 @@ export function App() {
     }
   }
 
-  // Anchor initial root history state to prevent PWA from backing out to black screen
+  // Anchor initial root history state with a guard buffer to prevent PWA from backing out to black/empty screen
   useEffect(() => {
-    if (!window.history.state?.appRoot && window.location.pathname === '/') {
-      window.history.replaceState({ appRoot: true }, '');
+    if (!window.history.state?.appRoot && !window.history.state?.isGuard) {
+      const pathname = window.location.pathname;
+      if (pathname === '/') {
+        window.history.replaceState({ isGuard: true }, '', '/');
+        window.history.pushState({ appRoot: true }, '', '/');
+      } else {
+        const groupMatch = pathname.match(/^\/groups\/([a-zA-Z0-9_-]+)/);
+        const joinMatch = pathname.match(/^\/join\/([a-zA-Z0-9_-]+)/);
+        window.history.replaceState({ isGuard: true }, '', '/');
+        window.history.pushState(
+          groupMatch
+            ? { screen: 'group', groupId: groupMatch[1] }
+            : joinMatch
+              ? { screen: 'join', code: joinMatch[1] }
+              : { appRoot: true },
+          '',
+          pathname + window.location.search,
+        );
+      }
     }
   }, []);
 
@@ -84,7 +102,15 @@ export function App() {
         return;
       }
 
-      // 3. Synchronize screen routes
+      // 3. If user backed out to the root guard entry, trap it and stay on the app root
+      if (e.state?.isGuard) {
+        setActiveGroupId(null);
+        setJoinCode(null);
+        window.history.pushState({ appRoot: true }, '', '/');
+        return;
+      }
+
+      // 4. Synchronize screen routes
       const pathname = window.location.pathname;
       const groupMatch = pathname.match(/^\/groups\/([a-zA-Z0-9_-]+)/);
       const joinMatch = pathname.match(/^\/join\/([a-zA-Z0-9_-]+)/);
