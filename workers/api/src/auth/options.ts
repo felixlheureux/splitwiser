@@ -8,7 +8,16 @@ export const authOptions = (sendMagicLink: MagicLinkOptions['sendMagicLink']) =>
   advanced: {
     database: { generateId: 'uuid' },
     ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] },
+    defaultCookieAttributes: {
+      sameSite: 'none',
+      secure: true,
+    },
   },
+  trustedOrigins: [
+    'https://dash.splitwiser.app',
+    'https://splitwiser-dashboard-production.pages.dev',
+    'http://localhost:5173',
+  ],
   rateLimit: { enabled: true, storage: 'database' },
   plugins: [magicLink({ expiresIn: 600, storeToken: 'hashed', sendMagicLink })],
 } satisfies BetterAuthOptions);

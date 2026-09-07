@@ -1,67 +1,174 @@
+<div align="center">
+
 # Splitwiser
 
-Splitwiser is an open-source alternative to Splitwise for people who want the
-basics to stay simple and accessible. It is a mobile-first shared expense ledger
-for groups, with clear balances, repayment suggestions, and an installable PWA.
+**Free forever. Open source. Made for sharing.**
 
-Built in response to essential expense-sharing features becoming increasingly
-paywalled, Splitwiser keeps the core workflow focused: record expenses, see who
-owes what, and settle up without a subscription for basic use. The product and
-technical contract live in [SPEC.md](SPEC.md).
+An open-source alternative to Splitwise for people who want shared expenses to stay simple, fair, and accessible — without subscriptions, paywalled features, or mandatory app-store downloads.
 
-## Prerequisites
+[![Open Source](https://img.shields.io/badge/Open-Source-0d9488?style=flat-square)](https://github.com/felixlheureux/splitwiser)
+[![Free Forever](https://img.shields.io/badge/Free-Forever-10b981?style=flat-square)](https://github.com/felixlheureux/splitwiser)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+[![Cloudflare $0 Stack](https://img.shields.io/badge/Cloudflare-$0/mo-F38020?style=flat-square&logo=cloudflare&logoColor=white)](https://cloudflare.com)
+[![PWA Ready](https://img.shields.io/badge/PWA-Installable-purple?style=flat-square)](https://splitwiser.app)
 
-- Node.js 24.19.0 (see `.nvmrc`)
-- pnpm 11+
+[**Try the Web App**](https://dash.splitwiser.app) · [**Report Bug**](https://github.com/felixlheureux/splitwiser/issues) · [**Support on Buy Me a Coffee**](https://buymeacoffee.com/felixlheureux)
 
-## Quick start
+</div>
 
-```bash
-pnpm install
-cp .env.example .env
-pnpm dev
-```
+---
 
-Open http://localhost:5173. The dashboard is the current workspace app; the API
-and shared package provide its runtime foundation.
+## Why Splitwiser?
 
-Useful commands:
+Most expense-sharing apps started out helpful, but gradually locked basic features behind monthly subscriptions: delays when adding expenses, receipt limits, daily caps, and clunky ads.
 
-```bash
-pnpm build       # Production build
-pnpm lint        # Oxlint
-pnpm typecheck   # TypeScript project check
-pnpm preview     # Serve the production build locally
-pnpm dev:api     # Run the Cloudflare Worker locally
-pnpm check       # Run lint, typecheck, and all builds
-```
+Splitwiser is designed around a simple philosophy: **splitting a dinner bill or cabin trip with friends should never cost money or require everyone to create an account.**
 
-## Environment variables
+- 💚 **Free Forever & Open Source** — No premium tiers, no hidden subscriptions, no ads. Built for the community.
+- ⚡ **Zero-Friction (Guest Mode First)** — Create a group in seconds and start recording. Friends can view and add expenses without creating an account or downloading an app.
+- 🔗 **One-Click Share Links** — Send one invite link or short code. Friends tap, pick their name (or add a new one), and they're in.
+- 📱 **Mobile-First Installable PWA** — Feels like a native iOS and Android app. Install directly from your browser to your home screen with offline caching.
+- ⚖️ **Smart Debt Simplification** — Automatically calculates the minimum number of repayments needed so everyone settles up fairly with zero math.
+- 🛡️ **$0 Operating Cost Stack** — Architected to run 100% within free tiers: Cloudflare Workers, Cloudflare D1 (SQLite), Cloudflare Pages, Turnstile bot protection, and Resend.
 
-The dashboard loads the root `.env` file through Vite's `envDir` configuration.
-Start from [.env.example](.env.example):
+---
 
-```bash
-cp .env.example .env
-```
+## Features
 
-Only variables prefixed with `VITE_` are exposed to browser code. They may hold
-public configuration such as the API base URL, but never passwords, tokens,
-private keys, database credentials, or email provider secrets. Local `.env`
-files are ignored by Git; keep the example file current when adding a variable.
+- **Equal & Custom Splits**: Split bills equally among all or select participants with 1 tap.
+- **Offline Member Support**: Add friends who don't have the app yet. When they click the invite link, they can claim their existing balance in 1 click.
+- **Rejoin Protection**: Prevents duplicate members or accidental multiple claims in the same group.
+- **1-Tap Settle Up**: Clear record of repayments that update balances in real time.
+- **Passwordless Account Linking**: Link your email anytime via a password-free magic link delivered via Resend. Seamlessly merges guest groups into your profile.
+- **Multi-Layered Edge Security**: Cloudflare WAF rate limiting, Bot Fight Mode, payload size limits, and Cloudflare Turnstile challenge verification.
 
-Worker-only secrets will use Wrangler `.dev.vars` files locally and Wrangler
-secrets in deployed environments. Do not put those values in `.env`,
-`wrangler.jsonc`, source code, or committed configuration.
+---
 
-See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full local setup and
-environment conventions.
+## Tech Stack
 
-## Workspace layout
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend PWA** | React 19, Vite, Tailwind CSS v4, shadcn/ui, TanStack Query, Lucide Icons, `vite-plugin-pwa` (Workbox) |
+| **Backend API** | Cloudflare Workers, Hono, Drizzle ORM, Better Auth, Cloudflare Turnstile verification |
+| **Database** | Cloudflare D1 (Serverless SQLite at the edge) |
+| **Email Delivery** | Resend (Single-use magic links) |
+| **Infrastructure** | OpenTofu (Terraform), Cloudflare Provider v5, GitLab HTTP remote state backend |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js** `>=24.19.0 <25` (matches `.nvmrc`)
+- **pnpm** `11+`
+- **OpenTofu** `1.8+` (optional, for infrastructure management)
+
+### Local Development
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/felixlheureux/splitwiser.git
+   cd splitwiser
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pnpm install
+   ```
+
+3. **Configure environment**:
+   ```bash
+   cp .env.example .env
+   cp workers/api/.dev.vars.example workers/api/.dev.vars
+   ```
+
+4. **Initialize the local D1 database**:
+   ```bash
+   pnpm db:migrate:local
+   ```
+
+5. **Start development servers**:
+   ```bash
+   # Terminal 1: Run Frontend PWA
+   pnpm dev
+
+   # Terminal 2: Run Backend Cloudflare Worker API
+   pnpm dev:api
+   ```
+
+- **Frontend**: http://localhost:5173
+- **API**: http://localhost:8787
+
+---
+
+## Project Scripts
+
+| Command | Action |
+| :--- | :--- |
+| `pnpm dev` | Start dashboard Vite dev server |
+| `pnpm dev:api` | Start backend Hono API with Wrangler local D1 emulator |
+| `pnpm check` | Run linter, typecheck, test suites, and production builds |
+| `pnpm test` | Run API integration tests and dashboard unit tests |
+| `pnpm build` | Build production bundles for PWA and Worker |
+| `pnpm db:migrate:local` | Apply D1 schema migrations to local emulator |
+| `pnpm db:migrate:remote` | Apply D1 schema migrations to production Cloudflare D1 |
+| `pnpm infra:fmt` | Format OpenTofu infrastructure code |
+| `pnpm infra:validate` | Validate OpenTofu infrastructure configuration |
+
+---
+
+## Workspace Layout
 
 ```text
-apps/dashboard/   React + Vite PWA
-packages/         Shared browser/Worker contracts
-workers/          Cloudflare Workers API
-infra/cloudflare/ OpenTofu-managed Cloudflare resources
+splitwiser/
+├── apps/
+│   └── dashboard/        # React 19 + Vite PWA frontend (Tailwind v4, shadcn/ui)
+├── packages/
+│   └── shared/           # Shared TypeScript schemas, types, routes, and math
+├── workers/
+│   └── api/              # Hono REST API on Cloudflare Workers + D1 SQLite
+├── infra/
+│   └── cloudflare/       # OpenTofu infrastructure (Pages, D1, DNS, WAF, Turnstile)
+└── docs/
+    └── DEVELOPMENT.md    # Developer setup, conventions, and architectural details
 ```
+
+---
+
+## Infrastructure ($0/mo Guarantee)
+
+Splitwiser is designed to run completely on **free tiers**:
+
+- **Cloudflare Pages**: Free hosting, unlimited requests, direct git/CLI uploads.
+- **Cloudflare Workers**: 100,000 requests/day, sub-3ms execution time.
+- **Cloudflare D1**: 5,000,000 reads/day, 100,000 writes/day, 5 GB storage.
+- **Cloudflare DNS & Universal SSL**: Free authoritative DNS & auto-renewing edge SSL.
+- **Cloudflare Turnstile**: Free bot protection (1M challenges/mo).
+- **Resend**: Free tier (3,000 emails/mo, 100/day) for magic link sign-ins.
+
+See [`infra/cloudflare/README.md`](infra/cloudflare/README.md) for OpenTofu configuration and multi-account setup details.
+
+---
+
+## Contributing
+
+Contributions are welcome! Whether it's reporting a bug, improving documentation, or submitting a pull request:
+
+1. Fork the repo and create your branch from `main`.
+2. Make your changes and run `pnpm check` to ensure all tests, lints, and builds pass.
+3. Open a pull request describing your improvements.
+
+---
+
+## Support
+
+If Splitwiser saved you from an annoying expense-sharing subscription, consider supporting the project:
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/felixlheureux)
+
+---
+
+## License
+
+MIT License © 2026 Felix L'Heureux

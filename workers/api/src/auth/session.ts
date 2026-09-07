@@ -37,7 +37,7 @@ export async function getIdentity(c: Context<ApiEnv>): Promise<RequestIdentity> 
       path: '/',
       httpOnly: true,
       secure: true,
-      sameSite: 'Lax',
+      sameSite: 'None',
       maxAge: 365 * 24 * 60 * 60, // 1 year
     });
   }

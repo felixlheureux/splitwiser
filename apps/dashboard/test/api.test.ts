@@ -24,16 +24,16 @@ test('query and mutation options share routes, infer data, and update the group 
     if (path === apiRoutes.profile) return Response.json(alice);
     assert.equal(path, apiRoutes.groups);
     if (options?.method === 'POST') {
-      assert.deepEqual(JSON.parse(String(options.body)), { name: 'Trip' });
+      assert.deepEqual(JSON.parse(String(options.body)), { name: 'Trip', creatorName: 'Alice' });
       return Response.json(group, { status: 201 });
     }
     return Response.json({ groups: [] });
   });
   assert.equal(api.routes, apiRoutes);
-  await client.fetchQuery(api.profile.get());
-  await client.fetchQuery(api.groups.list(alice.id));
+  await client.query(api.profile.get());
+  await client.query(api.groups.list(alice.id));
   const create = new MutationObserver(client, api.groups.create(alice.id));
-  await create.mutate({ name: 'Trip' });
+  await create.mutate({ name: 'Trip', creatorName: 'Alice' });
   assert.deepEqual(client.getQueryData(api.groups.list(alice.id).queryKey), { groups: [group] });
   assert.equal(client.getQueryState(api.keys.groups.list(alice.id))?.isInvalidated, true);
   assert.notDeepEqual(api.keys.groups.list('alice'), api.keys.groups.list('bob'));
@@ -43,7 +43,7 @@ test('session expiry clears private groups and returns the app to sign-in', asyn
   const { client, api } = setup(t, () => Response.json({ error: { code: 'auth_required', message: 'Sign in again.' } }, { status: 401 }));
   client.setQueryData(api.keys.profile, alice);
   client.setQueryData(api.keys.groups.list(alice.id), { groups: [group] });
-  await assert.rejects(client.fetchQuery({ ...api.groups.list(alice.id), staleTime: 0 }));
+  await assert.rejects(client.query({ ...api.groups.list(alice.id), staleTime: 0 }));
   assert.equal(client.getQueryData(api.keys.profile), null);
   assert.equal(client.getQueryData(api.keys.groups.list(alice.id)), undefined);
 });
@@ -58,7 +58,7 @@ test('a create request finishing after sign-out cannot restore private cached da
   });
   client.setQueryData(api.keys.profile, alice);
   const create = new MutationObserver(client, api.groups.create(alice.id));
-  const pending = create.mutate({ name: 'Trip' });
+  const pending = create.mutate({ name: 'Trip', creatorName: 'Alice' });
   await requestStarted;
   await new MutationObserver(client, api.auth.signOut()).mutate();
   finishCreate(Response.json(group));
@@ -72,6 +72,16 @@ test('refreshing the profile for a different user removes the previous user’s 
   const { client, api } = setup(t, () => Response.json(bob));
   client.setQueryData(api.keys.profile, alice);
   client.setQueryData(api.keys.groups.list(alice.id), { groups: [group] });
-  assert.deepEqual(await client.fetchQuery(api.profile.get()), bob);
+  assert.deepEqual(await client.query(api.profile.get()), bob);
   assert.equal(client.getQueryData(api.keys.groups.list(alice.id)), undefined);
 });
+
+test('formatCents formats numbers with commas and currency symbols properly', async () => {
+  const { formatCents } = await import('../src/lib/utils');
+  assert.equal(formatCents(650000), '$6,500.00');
+  assert.equal(formatCents(6500), '$65.00');
+  assert.equal(formatCents(0), '$0.00');
+  assert.equal(formatCents(-650000), '-$6,500.00');
+  assert.equal(formatCents(123456789), '$1,234,567.89');
+});
+

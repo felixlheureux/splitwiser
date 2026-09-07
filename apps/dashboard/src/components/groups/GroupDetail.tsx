@@ -32,6 +32,7 @@ export function GroupDetail({ groupId }: GroupDetailProps) {
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [activeSettlement, setActiveSettlement] = useState<{
+    fromMemberId?: string;
     toMemberId: string;
     amountCents: number;
   } | null>(null);
@@ -74,6 +75,7 @@ export function GroupDetail({ groupId }: GroupDetailProps) {
 
   function handleSettleUp(repayment: SuggestedRepayment) {
     setActiveSettlement({
+      fromMemberId: repayment.fromMemberId,
       toMemberId: repayment.toMemberId,
       amountCents: repayment.amountCents,
     });
@@ -241,12 +243,12 @@ export function GroupDetail({ groupId }: GroupDetailProps) {
           <Plus className="h-5 w-5 mr-1" />
           Add Expense
         </Button>
-        {suggestedRepayments.some((r) => r.fromMemberId === myMemberId) && (
+        {suggestedRepayments.length > 0 && (
           <Button
             variant="outline"
             className="h-12 px-4 rounded-xl text-sm font-semibold border-amber-300 bg-amber-50/50 hover:bg-amber-100 text-amber-900"
             onClick={() => {
-              const myDebt = suggestedRepayments.find((r) => r.fromMemberId === myMemberId);
+              const myDebt = suggestedRepayments.find((r) => r.fromMemberId === myMemberId) || suggestedRepayments[0];
               if (myDebt) handleSettleUp(myDebt);
             }}
           >
@@ -259,7 +261,12 @@ export function GroupDetail({ groupId }: GroupDetailProps) {
       {/* Add Expense Sheet */}
       <AddExpenseSheet
         open={expenseSheetOpen}
-        onOpenChange={setExpenseSheetOpen}
+        onOpenChange={(open) => {
+          setExpenseSheetOpen(open);
+          if (!open) {
+            setActiveSettlement(null);
+          }
+        }}
         groupId={group.id}
         members={members}
         myMemberId={myMemberId}

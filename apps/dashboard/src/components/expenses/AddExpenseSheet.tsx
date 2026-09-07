@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
 import { Check, DollarSign, Receipt } from 'lucide-react';
@@ -22,6 +22,7 @@ interface AddExpenseSheetProps {
   members: Member[];
   myMemberId?: string | null;
   initialSettlement?: {
+    fromMemberId?: string;
     toMemberId: string;
     amountCents: number;
   } | null;
@@ -48,7 +49,7 @@ export function AddExpenseSheet({
     defaultValues: {
       description: initialSettlement ? 'Settlement Payment' : '',
       amount: initialSettlement ? (initialSettlement.amountCents / 100).toFixed(2) : '',
-      paidByMemberId: defaultPayer,
+      paidByMemberId: initialSettlement?.fromMemberId || defaultPayer,
       splitWithMemberIds: initialSettlement
         ? [initialSettlement.toMemberId]
         : members.map((m) => m.id),
@@ -74,6 +75,30 @@ export function AddExpenseSheet({
       );
     },
   });
+
+  // Sync splitType and form values whenever modal opens or initialSettlement changes
+  useEffect(() => {
+    if (!open) return;
+    if (initialSettlement) {
+      setSplitType('settlement');
+      form.setFieldValue(
+        'paidByMemberId',
+        initialSettlement.fromMemberId || defaultPayer,
+      );
+      form.setFieldValue('splitWithMemberIds', [initialSettlement.toMemberId]);
+      form.setFieldValue(
+        'amount',
+        (initialSettlement.amountCents / 100).toFixed(2),
+      );
+      form.setFieldValue('description', 'Settlement Payment');
+    } else {
+      setSplitType('equal');
+      form.setFieldValue('paidByMemberId', defaultPayer);
+      form.setFieldValue('splitWithMemberIds', members.map((m) => m.id));
+      form.setFieldValue('amount', '');
+      form.setFieldValue('description', '');
+    }
+  }, [open, initialSettlement, defaultPayer, members]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

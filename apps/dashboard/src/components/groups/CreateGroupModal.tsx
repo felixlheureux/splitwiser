@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from '@tanstack/react-form';
 import { useMutation } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
@@ -33,13 +34,16 @@ export function CreateGroupModal({
   const form = useForm({
     defaultValues: {
       name: '',
-      creatorName: defaultCreatorName || 'You',
+      creatorName: '',
     },
     onSubmit: async ({ value }) => {
+      const trimmedCreatorName = value.creatorName.trim();
+      if (!trimmedCreatorName) return;
+
       create.mutate(
         {
           name: value.name.trim(),
-          creatorName: value.creatorName.trim() || 'You',
+          creatorName: trimmedCreatorName,
         },
         {
           onSuccess: (newGroup) => {
@@ -51,6 +55,12 @@ export function CreateGroupModal({
       );
     },
   });
+
+  useEffect(() => {
+    if (!open) {
+      form.reset();
+    }
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -103,7 +113,12 @@ export function CreateGroupModal({
             )}
           </form.Field>
 
-          <form.Field name="creatorName">
+          <form.Field
+            name="creatorName"
+            validators={{
+              onChange: ({ value }) => (!value.trim() ? 'Your name is required' : undefined),
+            }}
+          >
             {(field) => (
               <div className="space-y-1.5">
                 <label htmlFor="creator-name" className="text-xs font-semibold text-slate-700">
@@ -111,12 +126,18 @@ export function CreateGroupModal({
                 </label>
                 <Input
                   id="creator-name"
-                  placeholder="e.g. Alex"
+                  placeholder={defaultCreatorName ? `e.g. ${defaultCreatorName}` : 'Your name (e.g. Alex)'}
                   value={field.state.value}
                   onChange={(e) => field.handleChange(e.target.value)}
                   disabled={create.isPending}
                   maxLength={80}
+                  required
                 />
+                {field.state.meta.errors?.[0] && (
+                  <p className="text-xs text-rose-600">
+                    {String(field.state.meta.errors[0])}
+                  </p>
+                )}
               </div>
             )}
           </form.Field>

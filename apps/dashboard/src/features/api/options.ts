@@ -176,11 +176,19 @@ export function createAPI(queryClient: QueryClient, appOrigin: string) {
       signIn: () =>
         mutationOptions({
           mutationKey: ['auth', 'sign-in'],
-          mutationFn: (email: string) =>
-            request<{ status: boolean }>(apiRoutes.auth.signIn, {
+          mutationFn: (input: string | { email: string; turnstileToken?: string }) => {
+            const email = typeof input === 'string' ? input : input.email;
+            const turnstileToken = typeof input === 'string' ? undefined : input.turnstileToken;
+            return request<{ status: boolean }>(apiRoutes.auth.signIn, {
               method: 'POST',
-              body: JSON.stringify({ email, callbackURL: `${appOrigin}/`, errorCallbackURL: `${appOrigin}/?authError=1` }),
-            }),
+              body: JSON.stringify({
+                email,
+                callbackURL: `${appOrigin}/`,
+                errorCallbackURL: `${appOrigin}/?authError=1`,
+                ...(turnstileToken ? { turnstileToken } : {}),
+              }),
+            });
+          },
         }),
       signOut: () =>
         mutationOptions({

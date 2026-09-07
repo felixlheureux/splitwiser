@@ -1,0 +1,7 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Host & Sitemaps
+Host: https://splitwiser.app
+Sitemap: https://splitwiser.app/sitemap.xml

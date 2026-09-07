@@ -2,6 +2,8 @@
   "name": "splitwiser",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
+  "description": "Free forever, open-source group expense splitter. Zero friction, installable PWA, and no paywalls. Built for the things we share.",
   "packageManager": "pnpm@11.22.0",
   "engines": {
     "node": ">=24.19.0 <25",
@@ -9,6 +11,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter dashboard dev",
+    "dev:landing": "pnpm --filter landing dev",
     "dev:api": "pnpm --filter api dev",
     "build": "pnpm -r --if-present run build",
     "lint": "pnpm -r --if-present run lint",
@@ -20,7 +23,12 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "infra:fmt": "tofu -chdir=infra/cloudflare fmt",
     "infra:validate": "tofu -chdir=infra/cloudflare validate",
-    "infra:plan": "tofu -chdir=infra/cloudflare plan"
+    "infra:plan": "tofu -chdir=infra/cloudflare plan",
+    "deploy:landing": "pnpm --filter landing build && wrangler pages deploy apps/landing/dist --project-name splitwiser-landing-production --branch main",
+    "deploy:dashboard": "pnpm --filter dashboard build && wrangler pages deploy apps/dashboard/dist --project-name splitwiser-dashboard-production --branch main",
+    "deploy:pages": "pnpm deploy:landing && pnpm deploy:dashboard",
+    "deploy:api": "pnpm --filter api db:migrate:remote && wrangler deploy --config workers/api/wrangler.jsonc",
+    "deploy:all": "pnpm deploy:api && pnpm deploy:pages"
   },
   "devDependencies": {
     "wrangler": "^4.128.0"

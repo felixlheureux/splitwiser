@@ -54,6 +54,7 @@ export function BalanceSummaryCard({
                 : 'text-slate-800'
             }`}
           >
+            {myBalance > 0 ? '+' : ''}
             {formatCents(myBalance)}
           </span>
           {myBalance === 0 && (
@@ -99,16 +100,19 @@ export function BalanceSummaryCard({
                       <span className="font-bold text-slate-900">
                         {formatCents(rep.amountCents)}
                       </span>
-                      {isMyDebt && (
-                        <Button
-                          size="sm"
-                          className="h-7 text-[11px] px-2.5 font-semibold bg-teal-600 hover:bg-teal-700"
-                          onClick={() => onSettleUp(rep)}
-                        >
-                          <DollarSign className="h-3 w-3 -mr-1" />
-                          Settle
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant={isMyDebt ? 'default' : 'outline'}
+                        className={`h-7 text-[11px] px-2.5 font-semibold ${
+                          isMyDebt
+                            ? 'bg-teal-600 hover:bg-teal-700 text-white'
+                            : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                        }`}
+                        onClick={() => onSettleUp(rep)}
+                      >
+                        <DollarSign className="h-3 w-3 -mr-1" />
+                        Settle
+                      </Button>
                     </div>
                   </div>
                 );

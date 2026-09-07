@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
-import { createAuth } from './auth';
+import { bodyLimit } from 'hono/body-limit';
 import { ApiError, errorResponse, type ApiEnv } from './errors';
 import { corsMiddleware } from './middleware/cors';
 import { errorHandler } from './middleware/error-handler';
 import { requestIdMiddleware } from './middleware/request-id';
+import auth from './routes/auth';
 import expenses from './routes/expenses';
 import groups from './routes/groups';
 import health from './routes/health';
@@ -16,10 +17,23 @@ const app = new Hono<ApiEnv>();
 
 app.use('*', requestIdMiddleware);
 app.use('*', corsMiddleware);
+app.use(
+  '/api/*',
+  bodyLimit({
+    maxSize: 50 * 1024,
+    onError: (c) =>
+      errorResponse(
+        c,
+        new ApiError('payload_too_large', 'Request payload too large (max 50KB).', 413),
+      ),
+  }),
+);
 app.use('/api/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
   c.header('Referrer-Policy', 'no-referrer');
-  await getIdentity(c);
+  if (!c.req.path.startsWith('/api/auth')) {
+    await getIdentity(c);
+  }
   await next();
 });
 
@@ -29,8 +43,7 @@ app.route('/', me);
 app.route('/', groups);
 app.route('/', members);
 app.route('/', expenses);
-
-app.all('/api/auth/*', (c) => createAuth(c.env).handler(c.req.raw));
+app.route('/', auth);
 
 app.onError(errorHandler);
 

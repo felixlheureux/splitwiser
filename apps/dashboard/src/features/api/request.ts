@@ -1,7 +1,7 @@
 import { ApiError } from '@splitwiser/shared';
 export { ApiError } from '@splitwiser/shared';
 
-const apiBase = (import.meta.env?.VITE_API_BASE_URL || 'http://localhost:8787').replace(/\/$/, '');
+const apiBase = (typeof window === 'undefined' ? 'http://localhost:8787' : (import.meta.env?.VITE_API_BASE_URL ?? '')).replace(/\/$/, '');
 
 export async function request<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response;

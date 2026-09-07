@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "splitwiser-api-production",
+  "account_id": "451182ca7dd1755c7890284c1f7207f4",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-03",
   "compatibility_flags": ["nodejs_compat"],
@@ -13,14 +14,14 @@
     },
   },
   "vars": {
-    "API_ORIGIN": "https://api.splitwiser.app",
+    "API_ORIGIN": "https://dash.splitwiser.app",
     "APP_ORIGIN": "https://dash.splitwiser.app",
   },
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "splitwiser-d1-production",
-      "database_id": "replace-with-cloudflare-d1-database-id",
+      "database_id": "bd7e70cc-9474-4a04-81b5-fc7bc54bab39",
     },
   ],
 }

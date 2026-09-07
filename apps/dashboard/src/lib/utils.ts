@@ -5,8 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 export function formatCents(cents: number): string {
-  const abs = Math.abs(cents);
-  const dollars = (abs / 100).toFixed(2);
-  return `${cents < 0 ? '-' : ''}$${dollars}`;
+  const normalized = Math.abs(cents) < 0.5 ? 0 : cents;
+  return currencyFormatter.format(normalized / 100);
 }
+

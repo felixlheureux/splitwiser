@@ -32,23 +32,19 @@ resource "cloudflare_d1_database" "app" {
   provider   = cloudflare.app
   account_id = var.cloudflare_app_account_id
   name       = var.d1_database_name
+
+  lifecycle {
+    ignore_changes = [read_replication]
+  }
 }
 
-resource "cloudflare_turnstile_widget" "login" {
-  provider   = cloudflare.app
-  account_id = var.cloudflare_app_account_id
-  name       = "Splitwiser Login"
-  domains    = [var.dashboard_domain, "localhost"]
-  mode       = "managed"
-  region     = "world"
-}
 
 resource "cloudflare_dns_record" "dashboard" {
   provider = cloudflare.dns
   zone_id  = var.cloudflare_zone_id
   name     = var.dashboard_subdomain
   type     = "CNAME"
-  content  = "${cloudflare_pages_project.dashboard.subdomain}.pages.dev"
+  content  = cloudflare_pages_project.dashboard.subdomain
   ttl      = 1
   proxied  = true
 }
@@ -59,7 +55,7 @@ resource "cloudflare_dns_record" "landing" {
   zone_id  = var.cloudflare_zone_id
   name     = var.root_domain
   type     = "CNAME"
-  content  = "${cloudflare_pages_project.landing[0].subdomain}.pages.dev"
+  content  = cloudflare_pages_project.landing[0].subdomain
   ttl      = 1
   proxied  = true
 }
@@ -78,3 +74,6 @@ resource "cloudflare_dns_record" "email_provider" {
   ttl      = 1
   proxied  = false
 }
+
+
+

@@ -18,11 +18,6 @@ output "d1_database_id" {
   value       = cloudflare_d1_database.app.id
 }
 
-output "turnstile_sitekey" {
-  description = "Public Turnstile site key for the dashboard login flow."
-  value       = cloudflare_turnstile_widget.login.sitekey
-}
-
 output "landing_pages_project_name" {
   description = "Future landing Pages project name, when enabled."
   value       = var.create_landing_project ? cloudflare_pages_project.landing[0].name : null

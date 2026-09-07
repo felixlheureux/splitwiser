@@ -43,8 +43,8 @@ export const groupSchema = z.object({
 });
 
 export const createGroupSchema = z.object({
-  name: z.string().trim().min(1).max(80),
-  creatorName: z.string().trim().min(1).max(80).default('You'),
+  name: z.string().trim().min(1, 'Group name is required').max(80),
+  creatorName: z.string().trim().min(1, 'Your name is required').max(80),
 });
 
 export const memberSchema = z.object({

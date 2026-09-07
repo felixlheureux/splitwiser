@@ -85,7 +85,7 @@ members.post('/api/groups/join/:code', async (c) => {
   const [group] = await db.select().from(groupsTable).where(eq(groupsTable.inviteCode, code));
   if (!group) throw new ApiError('not_found', 'Invalid invite link.', 404);
 
-  // Reject if this identity is already a member of this group
+  // Check if this identity is already a member of this group
   const [alreadyMember] = await db
     .select()
     .from(groupMembersTable)
@@ -98,15 +98,11 @@ members.post('/api/groups/join/:code', async (c) => {
       ),
     );
 
-  if (alreadyMember) {
-    throw new ApiError('already_member', 'You are already a member of this group.', 409);
-  }
-
   let memberId: string;
   const now = new Date().toISOString();
 
   if (input.memberId) {
-    // Claiming an existing member
+    // Claiming / reclaiming an existing member
     const [existingMember] = await db
       .select()
       .from(groupMembersTable)
@@ -114,18 +110,23 @@ members.post('/api/groups/join/:code', async (c) => {
 
     if (!existingMember) throw new ApiError('not_found', 'Member not found.', 404);
 
-    // If claimed by someone else, reject
-    const isClaimedByOther =
-      (existingMember.userId && (identity.type !== 'user' || existingMember.userId !== identity.id)) ||
-      (existingMember.guestId && (identity.type !== 'guest' || existingMember.guestId !== identity.id));
-
-    if (isClaimedByOther) {
-      throw new ApiError('claim_taken', 'This member was already claimed.', 409);
+    // If this identity is already assigned to a different member in this group, release the old one
+    if (alreadyMember && alreadyMember.id !== existingMember.id) {
+      await db
+        .update(groupMembersTable)
+        .set({
+          userId: null,
+          guestId: null,
+        })
+        .where(eq(groupMembersTable.id, alreadyMember.id));
     }
+
+    const finalName = input.name?.trim() ? input.name.trim() : existingMember.name;
 
     await db
       .update(groupMembersTable)
       .set({
+        name: finalName,
         userId: identity.type === 'user' ? identity.id : null,
         guestId: identity.type === 'guest' ? identity.id : null,
       })
@@ -134,6 +135,10 @@ members.post('/api/groups/join/:code', async (c) => {
     memberId = existingMember.id;
   } else {
     // Adding a new member
+    if (alreadyMember) {
+      throw new ApiError('already_member', 'You are already a member of this group.', 409);
+    }
+
     const name = input.name || (identity.type === 'user' ? identity.name : 'New Member');
     memberId = crypto.randomUUID();
 

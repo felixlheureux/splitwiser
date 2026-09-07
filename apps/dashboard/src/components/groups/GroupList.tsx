@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import type { Me } from '@splitwiser/shared';
 import { useAPI } from '../../hooks/useAPI';
+import { InstallBanner } from '../pwa/InstallBanner';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
@@ -39,9 +40,9 @@ export function GroupList({ user, onSelectGroup, onNewGroup, onJoinCode }: Group
   }
 
   return (
-    <div className="flex-1 flex flex-col p-4 space-y-5">
+    <div className="flex-1 flex flex-col p-4 space-y-4">
       {/* Welcome Banner */}
-      <div className="space-y-1 pt-2">
+      <div className="space-y-1 pt-1">
         <span className="text-xs font-semibold text-teal-600 uppercase tracking-wider">
           {user.name ? `Welcome, ${user.name}` : 'Welcome'}
         </span>
@@ -52,6 +53,9 @@ export function GroupList({ user, onSelectGroup, onNewGroup, onJoinCode }: Group
           Trips, dinners, households, and shared expenses.
         </p>
       </div>
+
+      {/* PWA Install Banner */}
+      <InstallBanner />
 
       {/* Action cards: New Group + Join with Code */}
       <div className="space-y-2">
@@ -125,7 +129,7 @@ export function GroupList({ user, onSelectGroup, onNewGroup, onJoinCode }: Group
                   className="cursor-pointer transition-all hover:border-teal-500/50 hover:shadow-sm border-slate-200/80 active:scale-[0.99]"
                   onClick={() => onSelectGroup(group.id)}
                 >
-                  <CardContent className="p-4 flex items-center justify-between">
+                  <CardContent className="flex items-center justify-between">
                     <div className="flex items-center gap-3 truncate pr-2">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 font-bold text-base shadow-2xs">
                         {group.name.slice(0, 1).toUpperCase()}

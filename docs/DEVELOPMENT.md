@@ -1,120 +1,194 @@
-# Development guide
+# Splitwiser Development Guide
 
-## Setup
+This guide covers local environment setup, architecture conventions, testing, and development workflows across the Splitwiser monorepo.
 
-Use the pinned package manager from the repository root:
+---
+
+## 1. Local Setup
+
+### Prerequisites
+- **Node.js** `>=24.19.0 <25` (enforced via `.nvmrc` and `package.json`)
+- **pnpm** `11+` (`corepack enable` recommended)
+- **OpenTofu** `1.8+` (for infrastructure changes in `infra/cloudflare`)
+
+### Initial Workspace Bootstrap
 
 ```bash
 nvm install
 nvm use
 corepack enable
 pnpm install
+
+# Copy environment templates
 cp .env.example .env
+cp workers/api/.dev.vars.example workers/api/.dev.vars
+
+# Apply initial local SQLite/D1 migrations
+pnpm db:migrate:local
+```
+
+### Starting the Local Environment
+
+Run the two services in separate terminals:
+
+```bash
+# Terminal 1: Vite React Dashboard (Runs at http://localhost:5173)
 pnpm dev
+
+# Terminal 2: Cloudflare Worker API with local D1 emulator (Runs at http://localhost:8787)
+pnpm dev:api
 ```
 
-The dashboard runs at http://localhost:5173. Vite reads environment files from
-the repository root so all workspace apps can share documented public settings.
+---
 
-## Environment conventions
+## 2. Environment Variables & Conventions
 
-### Browser apps
+### Browser Application (`apps/dashboard`)
 
-Browser-exposed configuration must use the `VITE_` prefix. These values are
-embedded into the static build and are not secrets:
+Configuration exposed to the browser must use the `VITE_` prefix. These values are bundled at build time and **are not secrets**:
 
-| Variable            | Purpose                                      | Local example           |
-| ------------------- | -------------------------------------------- | ----------------------- |
-| `VITE_APP_ENV`      | App environment label                        | `development`           |
-| `VITE_API_BASE_URL` | API origin used by the dashboard             | `http://localhost:8787` |
-| `VITE_ENABLE_MSW`   | Enable mock-service-worker wiring when added | `false`                 |
+| Variable | Purpose | Default / Local Value |
+| :--- | :--- | :--- |
+| `VITE_APP_ENV` | Environment identifier | `development` |
+| `VITE_API_BASE_URL` | Cloudflare Worker API base URL | `http://localhost:8787` |
+| `VITE_TURNSTILE_SITE_KEY` | Public Cloudflare Turnstile widget key | `1x00000000000000000000AA` (Cloudflare test sitekey) |
+| `VITE_ENABLE_MSW` | Enable Mock Service Worker (if needed) | `false` |
 
-Copy `.env.example` to `.env` for local work. It is the complete variable
-inventory, but Vite only reads `VITE_*` entries and OpenTofu only reads `TF_*`
-entries when they are exported into the shell. Never commit `.env`, `.env.local`,
-or any file containing real credentials.
+> [!CAUTION]
+> Never store passwords, private keys, database tokens, or email API keys in `.env` or variables prefixed with `VITE_`.
 
-To load the OpenTofu entries into the current shell, use:
+### Cloudflare Worker API (`workers/api`)
 
-```bash
-set -a; source .env; set +a
-```
-
-Then run the commands from the infrastructure guide. Worker-only secrets still
-belong in `workers/api/.dev.vars`.
-
-### Local D1 and auth
-
-The API Worker uses Wrangler's local SQLite-backed D1 emulator by default. Apply
-the numbered migrations from `workers/api` before starting the API:
-
-```bash
-pnpm --filter api db:migrate:local
-pnpm --filter api dev
-```
-
-Migrations are ordered deliberately: Better Auth's generated tables are applied
-first and application tables with composite foreign keys second. The
-remote command is manual and must only be used after reviewing the migration:
-
-```bash
-pnpm --filter api db:migrate:remote
-```
-
-Never use `--remote` for routine local development.
-
-### Cloudflare Worker
-
-Keep local secrets in a Worker-specific
-`.dev.vars` file and commit only a redacted `.dev.vars.example`:
+The API reads secrets from `workers/api/.dev.vars` locally (which is git-ignored) and from Cloudflare Worker secrets in production:
 
 ```dotenv
-BETTER_AUTH_SECRET=replace-with-a-local-random-value
-RESEND_API_KEY=replace-with-a-local-value
-TURNSTILE_SECRET_KEY=replace-if-enabled
+BETTER_AUTH_SECRET=9169f5618d6746e52e0053db0584988d066f371e257f42ba1781e6649774ba11
+INVITE_SIGNING_SECRET=0a728a1159cd38cbe704c56a35e8dcd42d9e198c272d95801e274efe21a6f0ff
+RESEND_API_KEY=re_your_resend_api_key
+TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
 ```
 
-Use `wrangler secret put NAME` for deployed secrets. Worker secrets must never
-use the `VITE_` prefix because they must not reach the browser bundle.
-
-## Checks before opening a merge request
-
+In production, secrets are provisioned via Wrangler:
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm build
-pnpm test
+wrangler secret put BETTER_AUTH_SECRET
+wrangler secret put RESEND_API_KEY
+wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
-Infrastructure is managed with OpenTofu only. Local checks do not connect to
-GitLab state:
+---
+
+## 3. Database & Migrations (Cloudflare D1)
+
+Splitwiser uses SQLite backed by Cloudflare D1 via Drizzle ORM. Migrations live in `workers/api/migrations/`:
+
+```text
+0000_better_auth.sql          # Auth schema (user, session, account, verification)
+0001_initial_application_schema.sql  # Groups, members, expenses
+```
+
+### Local Migrations
+```bash
+pnpm db:migrate:local
+```
+This applies new SQL migrations to Wrangler's local SQLite emulator (`.wrangler/state/v3/d1/`).
+
+### Remote Migrations
+```bash
+pnpm db:migrate:remote
+```
+> [!WARNING]
+> Only apply remote migrations after reviewing changes and backing up production data.
+
+---
+
+## 4. Testing & Verification
+
+Run the full suite of checks before opening a pull request:
 
 ```bash
-tofu -chdir=infra/cloudflare init -backend=false
-tofu -chdir=infra/cloudflare fmt -check -recursive
+# Run all lints, typechecks, integration tests, and builds
+pnpm check
+```
+
+Or run targeted commands:
+```bash
+pnpm lint          # Run oxlint across all packages
+pnpm typecheck     # TypeScript strict typechecking
+pnpm test          # Run node:test integration suites (Miniflare D1 & frontend)
+pnpm build         # Build production bundles (Vite PWA & Wrangler dry-run)
+```
+
+### Infrastructure Checks (OpenTofu)
+```bash
+tofu -chdir=infra/cloudflare fmt -check
 tofu -chdir=infra/cloudflare validate
 ```
 
-GitHub hosts the source repository. Manual OpenTofu operations use the protected GitLab
-`splitwiser-production` HTTP state. Set `TF_HTTP_*` variables as documented in
-[infra/cloudflare/README.md](../infra/cloudflare/README.md), then run the plan
-and apply locally. GitLab only stores and locks state; it does not deploy the
-infrastructure or application. Never put backend credentials or Cloudflare
-tokens in committed files.
+---
 
-Keep `pnpm-lock.yaml` changes with dependency changes. Do not install packages
-from inside an individual workspace unless the command is intentionally scoped,
-for example `pnpm --filter dashboard add <package>`.
+## 5. Architecture & Code Organization
 
-## Adding dependencies
-
-Use unversioned install commands and let pnpm select the version:
-
-```bash
-pnpm --filter api add zod
-pnpm --filter dashboard add @tanstack/react-query
+```text
+splitwiser/
+├── apps/dashboard/
+│   ├── src/
+│   │   ├── components/       # shadcn/ui and feature components
+│   │   │   ├── auth/         # SaveAccountModal (with Turnstile integration)
+│   │   │   ├── expenses/     # AddExpenseSheet, ExpenseList
+│   │   │   ├── groups/       # GroupList, GroupDetail, JoinGroupView, BalanceSummaryCard
+│   │   │   ├── layout/       # AppHeader, AppMenuSheet, MobileShell
+│   │   │   ├── pwa/          # InstallBanner, IOSInstallModal
+│   │   │   └── ui/           # Radix / shadcn reusable primitives
+│   │   ├── features/api/     # Query options, mutations, and API request fetchers
+│   │   ├── hooks/            # useAPI, usePWAInstall
+│   │   └── lib/              # Formatting utilities, currency helpers
+│   └── vite.config.ts        # Vite + Tailwind v4 + VitePWA config
+├── packages/shared/
+│   ├── src/
+│   │   ├── balance.ts        # Graph debt simplification algorithm
+│   │   ├── routes.ts         # Centralized API endpoint paths
+│   │   └── schemas.ts        # Shared Zod validation schemas and TypeScript types
+└── workers/api/
+    ├── src/
+    │   ├── auth/             # Better Auth options, Turnstile verification, session cookies
+    │   ├── db/               # Drizzle D1 client and SQLite schema
+    │   ├── middleware/       # CORS, request ID, error handler, body-limit
+    │   ├── routes/           # Hono route handlers (auth, groups, members, expenses, me, health)
+    │   └── app.ts            # Hono application composition
+    └── test/                 # Miniflare D1 integration test suite
 ```
 
-Commit the manifest and root lockfile together. React UI goes in the dashboard's
-`components/`; API/data logic goes in `features/` and is exposed by `useAPI()`.
-The backend keeps its `auth/`, `routes/`, database files, and `middleware/`.
+---
+
+## 6. Progressive Web App (PWA) Notes
+
+- Built with `vite-plugin-pwa` with `generateSW` strategy.
+- Service worker precaches critical HTML, CSS, and JS bundles for instant loading.
+- Native installation prompt is captured via `beforeinstallprompt` on Android, Chrome, and Desktop browsers.
+- iOS Safari installation is guided through a custom modal (`IOSInstallModal`) demonstrating the native share sheet action.
+- Banner dismissal is persisted in `localStorage` (`splitwiser_pwa_banner_dismissed`).
+
+---
+
+## 7. Deploying to Cloudflare
+
+Splitwiser runs 100% on Cloudflare's serverless edge. You can deploy services individually or all together using the standard `pnpm` workspace scripts:
+
+```bash
+pnpm deploy:landing     # Build & upload apps/landing to splitwiser.app
+pnpm deploy:dashboard   # Build & upload apps/dashboard to dash.splitwiser.app
+pnpm deploy:pages       # Deploy both landing and dashboard
+pnpm deploy:api         # Run remote D1 migrations and deploy worker API
+pnpm deploy:all         # Deploy full stack (API + both Pages apps)
+```
+
+### First-Time Cloudflare Infrastructure Activation
+
+If deploying the landing site for the first time:
+1. Ensure `TF_VAR_create_landing_project=true` is set in `.env` or `infra/cloudflare/terraform.tfvars`.
+2. Apply the OpenTofu plan to provision `splitwiser-landing-production` and map the apex domain:
+   ```bash
+   pnpm infra:plan
+   tofu -chdir=infra/cloudflare apply
+   ```
+

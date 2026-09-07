@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 import { after, before, test } from 'node:test';
 import app from '../src/app';
+import type { ApiEnv } from '../src/errors';
 
-const apiOrigin = 'https://api.splitwiser.app';
+type Env = ApiEnv['Bindings'];
+
+const apiOrigin = 'https://dash.splitwiser.app';
 const appOrigin = 'https://dash.splitwiser.app';
 const runtime = new Miniflare(
   convertV4MiniflareOptions({
@@ -83,12 +86,13 @@ const request = (
     env,
   );
 
-async function sendLink(email: string, ip = '192.0.2.1') {
+async function sendLink(email: string, ip = '192.0.2.1', turnstileToken = 'valid-test-turnstile-token') {
   const response = await request('/api/auth/sign-in/magic-link', {
     body: {
       email,
       callbackURL: `${appOrigin}/`,
       errorCallbackURL: `${appOrigin}/?authError=1`,
+      turnstileToken,
     },
     ip,
   });
@@ -171,6 +175,25 @@ test('guest creates group, invites friend via link, splits bill, and settles up'
   const bobJoinInfo = await bobJoinInfoRes.json();
   assert.equal(bobJoinInfo.alreadyMember, true);
   assert.equal(bobJoinInfo.myMemberId, charlie.id);
+
+  // Bob lost his session (e.g. cleared cookies / new device) and reclaims Charlie
+  const newGuestJoinRes = await request(`/api/groups/join/${group.inviteCode}`, {
+    ip: '192.0.2.3',
+  });
+  const newGuestCookie = newGuestJoinRes.headers
+    .getSetCookie()
+    .find((c) => c.includes('splitwiser_guest='))!
+    .split(';')[0];
+
+  const reclaimRes = await request(`/api/groups/join/${group.inviteCode}`, {
+    cookie: newGuestCookie,
+    ip: '192.0.2.3',
+    body: { memberId: charlie.id },
+  });
+  assert.equal(reclaimRes.status, 201);
+  const reclaimData = await reclaimRes.json();
+  assert.equal(reclaimData.member.id, charlie.id);
+  assert.equal(reclaimData.member.name, 'Charlie');
 
   // 4. Alice adds an expense ($60 dinner split equally between Alice and Charlie/Bob)
   const detailRes = await request(`/api/groups/${group.id}`, { cookie: guestCookie });
@@ -284,9 +307,49 @@ test('email requests share a persistent rate limit across auth instances', async
     body: {
       email: 'limited@example.com',
       callbackURL: `${appOrigin}/`,
+      turnstileToken: 'valid-test-turnstile-token',
     },
     ip: '192.0.2.9',
   });
   assert.equal(limited.status, 429);
   assert.equal(emails.length - initialCount, 5);
 });
+
+test('turnstile protects magic link from automated abuse', async () => {
+  // 1. Missing turnstile token -> 403
+  const missingRes = await request('/api/auth/sign-in/magic-link', {
+    body: {
+      email: 'attacker@example.com',
+      callbackURL: `${appOrigin}/`,
+    },
+  });
+  assert.equal(missingRes.status, 403);
+  const missingBody = await missingRes.json();
+  assert.equal(missingBody.error.code, 'turnstile_failed');
+
+  // 2. Invalid turnstile token -> 403
+  const invalidRes = await request('/api/auth/sign-in/magic-link', {
+    body: {
+      email: 'attacker@example.com',
+      callbackURL: `${appOrigin}/`,
+      turnstileToken: 'invalid-turnstile-token',
+    },
+  });
+  assert.equal(invalidRes.status, 403);
+  const invalidBody = await invalidRes.json();
+  assert.equal(invalidBody.error.code, 'turnstile_failed');
+});
+
+test('bodyLimit rejects oversized payloads (>50KB)', async () => {
+  const largePayload = {
+    name: 'Big Group',
+    creatorName: 'A'.repeat(60 * 1024), // 60KB
+  };
+  const res = await request('/api/groups', {
+    body: largePayload,
+  });
+  assert.equal(res.status, 413);
+  const body = await res.json();
+  assert.equal(body.error.code, 'payload_too_large');
+});
+

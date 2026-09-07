@@ -10,12 +10,14 @@
     }
   },
   "scripts": {
+    "lint": "oxlint src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "oxlint": "^1.81.0",
     "typescript": "~6.0.3"
   }
 }
