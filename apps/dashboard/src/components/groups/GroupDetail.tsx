@@ -5,7 +5,6 @@ import {
   Archive,
   ArchiveRestore,
   Check,
-  DollarSign,
   Plus,
   Share2,
   Trash2,
@@ -328,27 +327,14 @@ export function GroupDetail({ groupId }: GroupDetailProps) {
       </div>
 
       {/* Sticky Bottom Action Bar */}
-      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto p-3 bg-white/95 backdrop-blur-md border-t border-slate-200/80 z-20 flex gap-2">
+      <div className="fixed bottom-0 inset-x-0 max-w-md mx-auto p-3 bg-white/95 backdrop-blur-md border-t border-slate-200/80 z-20">
         <Button
-          className="flex-1 h-12 rounded-xl text-sm font-semibold shadow-md bg-teal-600 hover:bg-teal-700"
+          className="w-full h-12 rounded-xl text-sm font-semibold shadow-md bg-teal-600 hover:bg-teal-700"
           onClick={openNewExpense}
         >
           <Plus className="h-5 w-5 mr-1" />
           Add Expense
         </Button>
-        {suggestedRepayments.length > 0 && (
-          <Button
-            variant="outline"
-            className="h-12 px-4 rounded-xl text-sm font-semibold border-amber-300 bg-amber-50/50 hover:bg-amber-100 text-amber-900"
-            onClick={() => {
-              const myDebt = suggestedRepayments.find((r) => r.fromMemberId === myMemberId) || suggestedRepayments[0];
-              if (myDebt) handleSettleUp(myDebt);
-            }}
-          >
-            <DollarSign className="h-4 w-4 mr-1 text-amber-700" />
-            Settle Up
-          </Button>
-        )}
       </div>
 
       {/* Member Removal Confirmation Dialog */}
