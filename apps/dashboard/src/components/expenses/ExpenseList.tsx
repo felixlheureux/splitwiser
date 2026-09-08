@@ -47,10 +47,16 @@ export function ExpenseList({ groupId, expenses, members, myMemberId }: ExpenseL
       {expenses.map((expense) => {
         const isSettlement = expense.splitType === 'settlement';
         const payerName = memberMap.get(expense.paidByMemberId) || 'Unknown';
-        const recipientName =
-          expense.splitWithMemberIds.length > 0
-            ? memberMap.get(expense.splitWithMemberIds[0]) || 'Someone'
-            : '';
+        const validRecipients = expense.splitWithMemberIds.filter((id) => id !== expense.paidByMemberId);
+        const recipientNames = validRecipients.map((id) => memberMap.get(id) || 'Someone');
+        const recipientText =
+          recipientNames.length === 0
+            ? 'Someone'
+            : recipientNames.length === 1
+            ? recipientNames[0]
+            : recipientNames.length === 2
+            ? `${recipientNames[0]} & ${recipientNames[1]}`
+            : `${recipientNames[0]} +${recipientNames.length - 1} others`;
         const isMyExpense = expense.paidByMemberId === myMemberId;
         const formattedDate = new Date(expense.createdAt).toLocaleDateString(undefined, {
           month: 'short',
@@ -86,7 +92,12 @@ export function ExpenseList({ groupId, expenses, members, myMemberId }: ExpenseL
                   <span>·</span>
                   <span className="truncate">
                     {isSettlement ? (
-                      `${isMyExpense ? 'You' : payerName} paid ${recipientName}`
+                      <>
+                        <span className="font-medium text-slate-600">
+                          {isMyExpense ? 'You' : payerName}
+                        </span>{' '}
+                        paid {recipientText}
+                      </>
                     ) : (
                       <>
                         <span className="font-medium text-slate-600">
@@ -96,10 +107,10 @@ export function ExpenseList({ groupId, expenses, members, myMemberId }: ExpenseL
                       </>
                     )}
                   </span>
-                  {!isSettlement && expense.splitWithMemberIds.length > 1 && (
+                  {(isSettlement ? validRecipients.length > 1 : expense.splitWithMemberIds.length > 1) && (
                     <span className="inline-flex items-center text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
                       <Users className="h-2.5 w-2.5 mr-0.5" />
-                      {expense.splitWithMemberIds.length}
+                      {isSettlement ? validRecipients.length : expense.splitWithMemberIds.length}
                     </span>
                   )}
                 </div>

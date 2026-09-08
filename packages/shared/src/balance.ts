@@ -28,11 +28,18 @@ export function calculateBalances(
     const { amountCents, paidByMemberId, splitType, splitWithMemberIds } = expense;
 
     if (splitType === 'settlement') {
-      // Direct payment from payer to recipient
-      const recipientId = splitWithMemberIds[0];
-      if (recipientId && recipientId !== paidByMemberId) {
+      // Direct payment from payer split across recipient member(s)
+      const recipients = splitWithMemberIds.filter((id) => id !== paidByMemberId);
+      const count = recipients.length;
+      if (count > 0) {
         net.set(paidByMemberId, (net.get(paidByMemberId) ?? 0) + amountCents);
-        net.set(recipientId, (net.get(recipientId) ?? 0) - amountCents);
+        const baseShare = Math.floor(amountCents / count);
+        const remainder = amountCents % count;
+
+        recipients.forEach((id, index) => {
+          const share = baseShare + (index < remainder ? 1 : 0);
+          net.set(id, (net.get(id) ?? 0) - share);
+        });
       }
     } else {
       // Equal split among selected members

@@ -440,4 +440,74 @@ test('member removal restrictions and execution', async () => {
   assert.equal(afterDetail.members.some((m: { id: string }) => m.id === bob.id), false);
 });
 
+test('settlement split across multiple recipients divides amount evenly in API', async () => {
+  const meRes = await request('/api/me');
+  const cookie = meRes.headers.getSetCookie().find((c) => c.includes('splitwiser_guest='))!.split(';')[0];
+
+  // 1. Create group with Alice
+  const groupRes = await request('/api/groups', {
+    cookie,
+    body: { name: 'Multi Settle Trip', creatorName: 'Alice' },
+  });
+  const group = await groupRes.json();
+
+  // Pre-add Bob and Charlie
+  const bobRes = await request(`/api/groups/${group.id}/members`, {
+    cookie,
+    body: { name: 'Bob' },
+  });
+  const bob = await bobRes.json();
+
+  const charlieRes = await request(`/api/groups/${group.id}/members`, {
+    cookie,
+    body: { name: 'Charlie' },
+  });
+  const charlie = await charlieRes.json();
+
+  const detailRes = await request(`/api/groups/${group.id}`, { cookie });
+  const detail = await detailRes.json();
+  const aliceId = detail.members.find((m: { name: string }) => m.name === 'Alice').id;
+
+  // 2. Alice pays $60 to settle Bob and Charlie ($30 each)
+  const settlementRes = await request(`/api/groups/${group.id}/expenses`, {
+    cookie,
+    body: {
+      description: 'Alice settles with Bob and Charlie',
+      amountCents: 6000,
+      paidByMemberId: aliceId,
+      splitType: 'settlement',
+      splitWithMemberIds: [bob.id, charlie.id],
+    },
+  });
+  assert.equal(settlementRes.status, 201);
+
+  // 3. Verify balances: Alice +6000, Bob -3000, Charlie -3000
+  const afterSettleRes = await request(`/api/groups/${group.id}`, { cookie });
+  const afterSettle = await afterSettleRes.json();
+
+  const aliceBal = afterSettle.balances.find((b: { memberId: string }) => b.memberId === aliceId);
+  const bobBal = afterSettle.balances.find((b: { memberId: string }) => b.memberId === bob.id);
+  const charlieBal = afterSettle.balances.find((b: { memberId: string }) => b.memberId === charlie.id);
+
+  assert.equal(aliceBal.balanceCents, 6000);
+  assert.equal(bobBal.balanceCents, -3000);
+  assert.equal(charlieBal.balanceCents, -3000);
+
+  // Suggested repayments: Bob owes Alice $30, Charlie owes Alice $30
+  assert.equal(afterSettle.suggestedRepayments.length, 2);
+  assert.ok(
+    afterSettle.suggestedRepayments.some(
+      (r: { fromMemberId: string; toMemberId: string; amountCents: number }) =>
+        r.fromMemberId === bob.id && r.toMemberId === aliceId && r.amountCents === 3000,
+    ),
+  );
+  assert.ok(
+    afterSettle.suggestedRepayments.some(
+      (r: { fromMemberId: string; toMemberId: string; amountCents: number }) =>
+        r.fromMemberId === charlie.id && r.toMemberId === aliceId && r.amountCents === 3000,
+    ),
+  );
+});
+
+
 

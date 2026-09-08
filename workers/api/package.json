@@ -8,7 +8,7 @@
     "build": "wrangler types && wrangler deploy --dry-run",
     "types": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply splitwiser-d1-production --local --config wrangler.jsonc",
-    "db:migrate:remote": "wrangler d1 migrations apply splitwiser-d1-production --remote --config wrangler.jsonc",
+    "db:migrate:remote": "set -a && [ -f ../../.env ] && . ../../.env && set +a && export CLOUDFLARE_API_TOKEN=\"${CLOUDFLARE_API_TOKEN:-$TF_VAR_cloudflare_app_api_token}\" CLOUDFLARE_ACCOUNT_ID=\"${CLOUDFLARE_ACCOUNT_ID:-$TF_VAR_cloudflare_app_account_id}\" && wrangler d1 migrations apply splitwiser-d1-production --remote --config wrangler.jsonc",
     "lint": "oxlint src",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "wrangler types && tsc --noEmit"

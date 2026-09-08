@@ -58,13 +58,19 @@ export function AddExpenseSheet({
       const parsedAmount = Math.round(parseFloat(value.amount) * 100);
       if (isNaN(parsedAmount) || parsedAmount <= 0) return;
 
+      const recipients =
+        splitType === 'settlement'
+          ? value.splitWithMemberIds.filter((id) => id !== value.paidByMemberId)
+          : value.splitWithMemberIds;
+      if (recipients.length === 0) return;
+
       createExpense.mutate(
         {
           description: value.description.trim() || (splitType === 'settlement' ? 'Settlement' : 'Expense'),
           amountCents: parsedAmount,
           paidByMemberId: value.paidByMemberId,
           splitType,
-          splitWithMemberIds: value.splitWithMemberIds,
+          splitWithMemberIds: recipients,
         },
         {
           onSuccess: () => {
@@ -263,7 +269,20 @@ export function AddExpenseSheet({
                   id="payer-select"
                   className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-xs focus:outline-none focus:ring-2 focus:ring-teal-600"
                   value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onChange={(e) => {
+                    const newPayer = e.target.value;
+                    field.handleChange(newPayer);
+                    if (splitType === 'settlement') {
+                      const currentRecipients = form.getFieldValue('splitWithMemberIds') || [];
+                      const validRecipients = currentRecipients.filter((id: string) => id !== newPayer);
+                      if (validRecipients.length === 0) {
+                        const fallback = members.find((m) => m.id !== newPayer)?.id;
+                        form.setFieldValue('splitWithMemberIds', fallback ? [fallback] : []);
+                      } else {
+                        form.setFieldValue('splitWithMemberIds', validRecipients);
+                      }
+                    }
+                  }}
                   disabled={createExpense.isPending}
                 >
                   {members.map((m) => (
@@ -354,31 +373,93 @@ export function AddExpenseSheet({
               }}
             </form.Field>
           ) : (
-            /* Settlement recipient */
-            <form.Field name="splitWithMemberIds">
+            /* Settlement recipient(s) */
+            <form.Field
+              name="splitWithMemberIds"
+              validators={{
+                onChange: ({ value }) => {
+                  const currentPayer = form.getFieldValue('paidByMemberId');
+                  const validRecipients = value.filter((id: string) => id !== currentPayer);
+                  return validRecipients.length === 0 ? 'Select at least one recipient' : undefined;
+                },
+              }}
+            >
               {(field) => {
-                const currentRecipient = field.state.value[0] || '';
                 const currentPayer = form.getFieldValue('paidByMemberId');
                 const recipientCandidates = members.filter((m) => m.id !== currentPayer);
+                const selected = field.state.value.filter((id: string) => id !== currentPayer);
+                const allSelected =
+                  recipientCandidates.length > 0 &&
+                  recipientCandidates.every((m) => selected.includes(m.id));
+                const amountVal = parseFloat(form.getFieldValue('amount') || '0');
+                const perPersonCents =
+                  selected.length > 0 && !isNaN(amountVal)
+                    ? Math.round((amountVal * 100) / selected.length)
+                    : 0;
 
                 return (
-                  <div className="space-y-1.5">
-                    <label htmlFor="recipient-select" className="text-xs font-semibold text-slate-700">
-                      Paid to
-                    </label>
-                    <select
-                      id="recipient-select"
-                      className="flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900 shadow-xs focus:outline-none focus:ring-2 focus:ring-teal-600"
-                      value={currentRecipient}
-                      onChange={(e) => field.handleChange([e.target.value])}
-                      disabled={createExpense.isPending}
-                    >
-                      {recipientCandidates.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} {m.id === myMemberId ? '(You)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-2 pt-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-slate-700">
+                        Paid to ({selected.length})
+                      </label>
+                      {recipientCandidates.length > 1 && (
+                        <button
+                          type="button"
+                          className="text-xs text-amber-700 font-semibold hover:underline"
+                          onClick={() => {
+                            field.handleChange(
+                              allSelected
+                                ? [recipientCandidates[0]?.id].filter(Boolean)
+                                : recipientCandidates.map((m) => m.id),
+                            );
+                          }}
+                        >
+                          {allSelected ? 'Select single' : 'Select all'}
+                        </button>
+                      )}
+                    </div>
+
+                    {perPersonCents > 0 && selected.length > 0 && (
+                      <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200/60 px-3 py-1.5 rounded-lg font-medium">
+                        {selected.length > 1
+                          ? `${formatCents(perPersonCents)} received by each person`
+                          : `Entire ${formatCents(Math.round(amountVal * 100))} received by 1 person`}
+                      </p>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                      {recipientCandidates.map((m) => {
+                        const isChecked = selected.includes(m.id);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className={`flex items-center justify-between rounded-xl border p-2.5 text-xs text-left transition-all ${
+                              isChecked
+                                ? 'border-amber-600 bg-amber-50/70 font-semibold text-amber-900 shadow-2xs'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                            }`}
+                            onClick={() => {
+                              if (isChecked) {
+                                if (selected.length > 1) {
+                                  field.handleChange(selected.filter((id) => id !== m.id));
+                                }
+                              } else {
+                                field.handleChange([...selected, m.id]);
+                              }
+                            }}
+                          >
+                            <span className="truncate">
+                              {m.name} {m.id === myMemberId ? '(You)' : ''}
+                            </span>
+                            {isChecked && (
+                              <Check className="h-3.5 w-3.5 text-amber-600 shrink-0 ml-1" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               }}
